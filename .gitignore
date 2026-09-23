@@ -1,0 +1,35 @@
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# Docker
+*.log
+
+# Datos y modelos locales (no versionar corpus ni pesos de modelos)
+data/
+models/
+*.gguf
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
