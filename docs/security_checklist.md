@@ -94,7 +94,32 @@ Marca cada ítem como `[ ]` pendiente, `[~]` en progreso o `[x]` completado. Est
 
 ---
 
+## 4. Superficie de ataque agregada 2026-09-23 (subida de documentos, voz, generación)
+
+### 4.1 Subida de documentos (`backend/app/documents.py`)
+- [x] Validar tipo real del archivo por "magic bytes" (no solo extensión) — `_validar_contenido_real()` rechaza un PDF/DOCX cuyo contenido no coincide con su cabecera esperada.
+- [x] Límite de tamaño máximo (15 MB) aplicado antes de procesar el archivo.
+- [x] Lista blanca de extensiones (`.pdf`, `.docx`, `.txt`) — cualquier otra se rechaza.
+- [x] El archivo original nunca se persiste en disco, solo el texto ya extraído.
+- [x] Aislamiento por sesión: un documento subido solo es recuperable con el mismo `session_id`, nunca cruza entre usuarios (ver `retrieve_session_fragments`).
+- [ ] **Pendiente:** no hay expiración automática de los documentos de una sesión — hoy solo se borran si el usuario pulsa "Quitar todos los documentos" o vía `DELETE /api/documents/{session_id}`. Evaluar un job de limpieza periódico antes de producción.
+- [ ] **Pendiente:** no se escanea el contenido extraído con un antivirus/sandbox — el texto extraído se trata como no confiable a nivel de prompt (sección 2), pero no hay una capa de escaneo de malware sobre el binario original antes de descartarlo.
+- [ ] **Pendiente:** no hay rate limiting específico sobre el endpoint de subida — un usuario podría subir archivos repetidamente para agotar espacio en Qdrant o CPU de embeddings.
+
+### 4.2 Generación de documentos (`backend/app/generation.py`)
+- [x] Los valores de los campos del formulario se insertan en el `.docx` vía Jinja2 `Template(...).render(**values)` sobre texto de plantilla fijo definido en el código, no sobre una plantilla controlada por el usuario — el usuario nunca puede inyectar su propia sintaxis Jinja2 como plantilla, solo como valores de campo.
+- [ ] **Pendiente:** no hay sanitización explícita de los valores de campo contra contenido malicioso incrustado en un `.docx` (ej. macros) — no aplica hoy porque `python-docx` genera el archivo desde cero y no incluye macros, pero debe revisarse si en el futuro se permite subir plantillas `.docx` externas.
+
+### 4.3 Voz (`backend/app/voice.py`)
+- [x] Las llamadas a Piper se hacen con `subprocess.run` pasando argumentos como **lista** (nunca como string concatenado ni `shell=True`), lo que evita inyección de comandos de shell.
+- [x] Timeouts definidos en las llamadas a `subprocess.run` (60-120s) para evitar que un proceso colgado agote recursos indefinidamente.
+- [ ] **Pendiente:** el tamaño/duración máxima del audio subido para transcripción no está limitado explícitamente — un archivo de audio muy largo podría consumir mucho CPU/tiempo en el modelo Whisper. Evaluar un límite de duración o tamaño antes de producción.
+- [ ] **Pendiente:** medir el impacto real en RAM del backend con Whisper + Piper + embeddings cargados simultáneamente en la VM ARM64 real (ver `docs/arquitectura.md §2.2`).
+
+---
+
 ## Próximos pasos sugeridos
 1. Priorizar los ítems de la sección 1.2 y 1.3 (aislamiento de red y privilegios) antes del primer despliegue, ya que son la base de todo lo demás.
 2. Definir el set de pruebas de red-teaming de prompt injection (sección 2.4) como parte del pipeline de CI/CD.
 3. Revisar este checklist junto con `docs/aviso_privacidad.md` para asegurar que el logging (sección 2.4 y 3.5) sea consistente con lo que se le informa al usuario.
+4. Antes de la auditoría de ciberseguridad externa: cerrar los pendientes marcados `[ ]` de la sección 4 (rate limiting de subida, expiración de documentos de sesión, límite de duración de audio), ya que son la superficie de ataque más nueva y menos probada del sistema.

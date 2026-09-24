@@ -97,17 +97,20 @@ def generate_answer(question: str, fragments: list[dict]) -> str:
         return response.json().get("response", "").strip()
 
 
-def answer_query(question: str, area: str | None = None) -> dict:
-    fragments = retrieve(question, area)
+AI_DISCLAIMER = (
+    "Esta respuesta fue generada por un sistema de inteligencia artificial y puede "
+    "contener errores u omisiones. Verifique siempre la información contra la fuente "
+    "original antes de utilizarla en cualquier trámite o gestión legal."
+)
+
+
+def answer_query(question: str, area: str | None = None, extra_fragments: list[dict] | None = None) -> dict:
+    fragments = retrieve(question, area) + (extra_fragments or [])
     respuesta_conversacional = generate_answer(question, fragments) if fragments else (
         "No se encontró contexto relevante en el corpus indexado para esta pregunta."
     )
     return {
         "respuesta": respuesta_conversacional,
         "fragmentos": fragments,
-        "disclaimer": (
-            "Esta respuesta fue generada por un sistema de inteligencia artificial y puede "
-            "contener errores u omisiones. Verifique siempre la información contra la fuente "
-            "original antes de utilizarla en cualquier trámite o gestión legal."
-        ),
+        "disclaimer": AI_DISCLAIMER,
     }

@@ -96,6 +96,30 @@ Ver `frontend/Dockerfile` (build en dos etapas: una que compila con Node, otra q
 
 ---
 
+## 6.2 Por qué la subida de documentos es temporal y no se mezcla con el corpus legal
+
+**Qué es:** el abogado puede subir un documento (PDF, Word o texto) para hacer preguntas sobre ESE documento específico (ej. "¿qué cláusula de este contrato habla de penalización por retraso?").
+
+**Para qué sirve:** cubre un caso de uso distinto al de consultar la ley general — analizar un documento particular del caso que se está llevando.
+
+**Por qué se eligió así (temporal, aislado por sesión):** existía la alternativa de que los documentos subidos se sumaran permanentemente al corpus legal compartido, pero eso abre un riesgo serio: cualquier usuario podría "contaminar" las respuestas que reciben TODOS los demás usuarios subiendo un documento incorrecto, desactualizado, o incluso malicioso. En vez de eso, cada documento se guarda en una base de datos vectorial separada (`session_documents`), etiquetado con un identificador de sesión que genera el navegador, y **solo se puede recuperar con ese mismo identificador** — es decir, el documento de un abogado nunca aparece en las respuestas de otro. Técnicamente esto se implementa igual que el filtro por área del derecho (Sección 6 más arriba), pero filtrando por sesión en vez de por área. Ver `backend/app/documents.py`.
+
+**Medidas de seguridad aplicadas** (relevantes para la revisión de ciberseguridad): se valida la extensión del archivo contra una lista blanca (`.pdf`, `.docx`, `.txt`), se limita el tamaño máximo (15 MB) para evitar abusos, y el archivo original nunca se guarda en disco — solo el texto ya extraído y trozado. El texto extraído se trata exactamente igual que el resto del contexto recuperado: nunca como instrucciones (mismo principio de la Sección 7.6).
+
+## 6.3 Por qué la generación de documentos es "solo el mecanismo" por ahora
+
+**Qué es:** una funcionalidad para llenar una plantilla con datos y descargar un documento Word (`.docx`) ya redactado.
+
+**Por qué se construyó solo el mecanismo, sin un documento legal real:** redactar el texto de un documento legal real (ej. una demanda alimenticia) es trabajo de un abogado, no de ingeniería — un error en ese texto tiene consecuencias legales directas. Lo que sí es trabajo de ingeniería es construir la "maquinaria" que, una vez que exista un texto ya revisado por un abogado, permita convertirlo en una plantilla usable sin tener que programar nada nuevo. Por eso `backend/app/generation.py` define un registro de plantillas (`TEMPLATES`) donde agregar un caso nuevo es solo cuestión de añadir una entrada con el texto y los campos que necesita — el resto del sistema (el formulario que ve el abogado, la exportación a Word) ya funciona automáticamente. La única plantilla que existe hoy está marcada explícitamente como "de prueba" y no debe usarse en ningún trámite real.
+
+## 6.4 Por qué la voz es Whisper + Piper autoalojados, y no la API de voz del navegador
+
+**Qué es:** Whisper es un modelo open source que convierte audio hablado en texto (transcripción); Piper es un modelo open source que convierte texto en audio hablado (síntesis de voz). Ambos corren como parte del contenedor del backend, no en un servicio externo.
+
+**Por qué NO se usó la función de voz que ya trae el navegador (Web Speech API):** es gratis y no requiere infraestructura propia, pero por dentro envía el audio grabado a los servidores de Google (en Chrome) para transcribirlo. Como las consultas de un abogado pueden incluir información sensible de un cliente hablada en voz alta, eso contradecría directamente el compromiso ya escrito en `aviso_privacidad.md` de que los datos no salen de nuestra infraestructura. Se decidió pagar el costo de más cómputo propio a cambio de mantener ese control.
+
+**Nota de buena práctica (relevante para la auditoría de ciberseguridad):** antes de escribir la integración con Piper, se verificó de forma manual —instalando el paquete real y ejecutándolo— cuáles eran los parámetros exactos de su línea de comandos y qué voces en español existen de verdad, en vez de asumirlo. Esto evitó construir sobre una API inventada o mal recordada. El detalle de esa verificación está documentado en `docs/spike_resultados.md`.
+
 ## 7. Buenas prácticas de programación aplicadas (y por qué importan)
 
 Esta sección explica prácticas que cualquier persona con experiencia en desarrollo de software da por sentadas, pero que no son obvias si nunca se ha programado en equipo.
@@ -147,13 +171,19 @@ rag-legal-guerrero/
 │   └── app/
 │       ├── main.py                    # Define los endpoints de la API (ej. /api/query)
 │       ├── rag.py                     # Lógica de recuperación + generación
-│       └── ingest.py                  # Script para cargar documentos al vector DB
+│       ├── ingest.py                  # Script para cargar documentos al vector DB
+│       ├── documents.py               # Subida ad-hoc de documentos (temporal, por sesión)
+│       ├── generation.py              # Mecanismo de plantillas → .docx
+│       └── voice.py                   # Transcripción (Whisper) y síntesis (Piper)
 ├── frontend/
 │   ├── Dockerfile                     # Build de dos etapas: compila con Node, sirve con Caddy
 │   ├── Caddyfile                      # Enrutamiento: /api/* → backend, resto → interfaz
 │   └── src/
-│       ├── App.tsx                    # Interfaz: filtro por área, formulario, paneles de resultado
-│       └── api.ts                     # Llamadas a la API del backend
+│       ├── App.tsx                    # Layout principal: filtro por área, formulario, resultados
+│       ├── api.ts                     # Llamadas a la API del backend
+│       ├── hooks/useSettings.ts       # Preferencias de tema/tamaño de texto (localStorage)
+│       └── components/                # SettingsPanel, CopyButton, DocumentUpload,
+│                                       # DocumentGenerator, VoiceControls
 └── fixtures/
     └── sample_corpus.md               # Datos FICTICIOS solo para pruebas locales
 ```
@@ -253,6 +283,14 @@ El proyecto se distribuye bajo licencia **Apache 2.0** ([LICENSE](../LICENSE)), 
 - [ ] Definir e implementar el sourcing real del corpus legal ([requerimientos_usuario.md §4](requerimientos_usuario.md)).
 - [ ] Implementar autenticación multiusuario real (actualmente el backend del spike no tiene login, y el frontend no tiene pantalla de inicio de sesión).
 - [x] Construir el frontend estructurado — implementado en `frontend/` (React + Vite + TS, servido vía Caddy) y validado end-to-end en local.
-- [ ] Definir y automatizar pruebas (tests) — no existen todavía.
+- [x] Tema claro/oscuro, tamaño de texto ajustable, diseño responsive y copiar al portapapeles.
+- [x] Subida de documentos ad-hoc (temporal, por sesión) — mecanismo implementado y validado.
+- [x] Mecanismo extensible de generación de documentos (sin plantillas legales reales todavía).
+- [x] Voz autoalojada (Whisper STT + Piper TTS) — implementado y validado localmente.
+- [ ] Añadir una plantilla legal real (ej. demanda alimenticia) al mecanismo de generación de documentos, redactada y revisada por un abogado.
+- [ ] Expiración/limpieza automática de documentos subidos por sesión (hoy solo se borran manualmente vía el botón "Quitar todos los documentos").
+- [ ] Definir e implementar el sourcing real del corpus legal ([requerimientos_usuario.md §4](requerimientos_usuario.md)).
+- [ ] Implementar autenticación multiusuario real (actualmente el backend del spike no tiene login, y el frontend no tiene pantalla de inicio de sesión).
+- [ ] Definir y automatizar pruebas (tests) — no existen todavía. Esto es especialmente relevante antes de la auditoría de ciberseguridad planeada.
 - [ ] Definir pipeline de CI/CD (integración/despliegue continuo) en GitHub Actions.
 - [ ] Completar los campos pendientes `[...]` en `aviso_privacidad.md` y en las plantillas de la Sección 9 de este manual, con revisión legal formal.

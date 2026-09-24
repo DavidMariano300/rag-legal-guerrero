@@ -26,6 +26,14 @@ Es un asistente que te ayuda a **recordar o verificar rápidamente** informació
 
 Por esto, **cada respuesta del sistema incluye un aviso de que fue generada por IA y debe verificarse** antes de usarse en cualquier trámite, escrito o asesoría real. Ver el detalle legal completo en [aviso_privacidad.md](aviso_privacidad.md).
 
+## 2.1 Funciones adicionales (agregadas 2026-09-23)
+
+- **Preferencias (⚙ arriba a la derecha):** puedes cambiar entre tema claro/oscuro y ajustar el tamaño de texto a tu gusto; la interfaz también se adapta a pantallas de celular/tablet.
+- **Copiar:** cada respuesta y cada fragmento citado tiene un botón para copiarlo directamente al portapapeles.
+- **Subir un documento:** puedes adjuntar un PDF, Word o texto (máx. 15 MB) para preguntar sobre ese documento en particular (ej. un contrato). Es **temporal**: solo dura mientras tengas la pestaña abierta, no se agrega al corpus legal general ni lo ve ningún otro usuario.
+- **Voz:** puedes dictar tu pregunta con el botón del micrófono (🎤) y escuchar la respuesta en voz alta (🔊 Escuchar). Todo el procesamiento de voz ocurre en nuestra propia infraestructura, nunca se envía a un servicio externo.
+- **Generar documento:** al final de la página hay un mecanismo para generar documentos `.docx` a partir de una plantilla. **Importante:** por ahora solo existe una plantilla de prueba ficticia para validar que el mecanismo funciona — todavía no hay ninguna plantilla de un documento legal real disponible.
+
 ## 3. Cómo se ve una respuesta
 
 Cuando hagas una pregunta, la respuesta llegará dividida en tres partes claramente separadas (no mezcladas en un solo bloque de texto):

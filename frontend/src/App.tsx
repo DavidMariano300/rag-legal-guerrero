@@ -1,5 +1,12 @@
 import { FormEvent, useState } from "react";
 import { consultar, QueryResponse } from "./api";
+import { useSettings } from "./hooks/useSettings";
+import SettingsPanel from "./components/SettingsPanel";
+import CopyButton from "./components/CopyButton";
+import DocumentUpload from "./components/DocumentUpload";
+import VoiceControls from "./components/VoiceControls";
+import DocumentGenerator from "./components/DocumentGenerator";
+import { getSessionId } from "./session";
 
 const AREAS = [
   { value: "", label: "Todas las áreas" },
@@ -11,8 +18,12 @@ const AREAS = [
 ];
 
 export default function App() {
+  const { theme, setTheme, fontSize, setFontSize } = useSettings();
+  const sessionId = getSessionId();
+
   const [pregunta, setPregunta] = useState("");
   const [area, setArea] = useState("");
+  const [usarDocumentos, setUsarDocumentos] = useState(false);
   const [resultado, setResultado] = useState<QueryResponse | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +37,7 @@ export default function App() {
     setResultado(null);
 
     try {
-      const data = await consultar(pregunta.trim(), area);
+      const data = await consultar(pregunta.trim(), area, sessionId, usarDocumentos);
       setResultado(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
@@ -37,6 +48,10 @@ export default function App() {
 
   return (
     <div className="page">
+      <div className="top-bar">
+        <SettingsPanel theme={theme} setTheme={setTheme} fontSize={fontSize} setFontSize={setFontSize} />
+      </div>
+
       <header className="header">
         <h1>RAG Legal Guerrero</h1>
         <p className="subtitle">Consulta rápida de legislación estatal y federal aplicable en Guerrero</p>
@@ -61,15 +76,20 @@ export default function App() {
 
         <label className="field">
           <span>Tu pregunta</span>
-          <textarea
-            value={pregunta}
-            onChange={(e) => setPregunta(e.target.value)}
-            placeholder="Ej. ¿Cuál es el plazo para contestar una demanda civil?"
-            rows={3}
-          />
+          <div className="question-row">
+            <textarea
+              value={pregunta}
+              onChange={(e) => setPregunta(e.target.value)}
+              placeholder="Ej. ¿Cuál es el plazo para contestar una demanda civil?"
+              rows={3}
+            />
+            <VoiceControls onTranscribed={(texto) => setPregunta((prev) => (prev ? `${prev} ${texto}` : texto))} />
+          </div>
         </label>
 
-        <button type="submit" disabled={cargando || !pregunta.trim()}>
+        <DocumentUpload sessionId={sessionId} usarDocumentos={usarDocumentos} setUsarDocumentos={setUsarDocumentos} />
+
+        <button type="submit" className="primary-button" disabled={cargando || !pregunta.trim()}>
           {cargando ? "Consultando..." : "Consultar"}
         </button>
       </form>
@@ -79,7 +99,13 @@ export default function App() {
       {resultado && (
         <div className="results">
           <section className="panel respuesta-panel">
-            <h2>Respuesta</h2>
+            <div className="panel-header">
+              <h2>Respuesta</h2>
+              <div style={{ display: "flex", gap: "0.4rem" }}>
+                <CopyButton text={resultado.respuesta} />
+                <VoiceControls modo="hablar" texto={resultado.respuesta} />
+              </div>
+            </div>
             <p>{resultado.respuesta}</p>
           </section>
 
@@ -88,8 +114,11 @@ export default function App() {
             {resultado.fragmentos.length === 0 && <p>No se encontraron fragmentos relevantes.</p>}
             {resultado.fragmentos.map((f, idx) => (
               <div className="fragmento" key={idx}>
-                <div className="fragmento-fuente">
-                  {f.fuente} · {f.area} · similitud {(f.score * 100).toFixed(0)}%
+                <div className="panel-header">
+                  <div className="fragmento-fuente">
+                    {f.fuente} · {f.area} · similitud {(f.score * 100).toFixed(0)}%
+                  </div>
+                  <CopyButton text={f.texto} label="Copiar" />
                 </div>
                 <p className="fragmento-texto">{f.texto}</p>
               </div>
@@ -99,6 +128,8 @@ export default function App() {
           <div className="result-disclaimer">{resultado.disclaimer}</div>
         </div>
       )}
+
+      <DocumentGenerator />
     </div>
   );
 }

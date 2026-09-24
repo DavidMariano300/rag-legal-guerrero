@@ -43,10 +43,13 @@ Con 4 OCPU / 24 GB RAM se propone repartir así (ajustable):
 
 - **Ollama + LLM**: ~2 OCPU / 12–14 GB RAM
 - **Vector DB**: ~1 OCPU / 4 GB RAM
-- **Backend API + Frontend**: ~1 OCPU / 4 GB RAM
-- Margen de ~2 GB para el propio SO y overhead de Docker
+- **Backend API** (embeddings + Whisper STT + Piper TTS + generación de documentos, todo en el mismo contenedor): ~1 OCPU / 3–4 GB RAM
+- **Frontend/proxy (Caddy)**: overhead mínimo (~256 MB)
+- Margen para el propio SO y overhead de Docker
 
 Todo en **una sola VM Ampere A1** para el MVP (no varias VMs orquestadas) — simplifica networking y evita cruzar el límite gratuito de balanceadores/IPs.
+
+**Actualización 2026-09-23:** al agregar voz (Whisper + Piper) y subida de documentos al mismo contenedor del backend, su necesidad de RAM subió de ~1 GB a ~3 GB en `docker-compose.yml` (validado localmente, pendiente medir en la VM ARM64 real — ver [spike_resultados.md](spike_resultados.md)). La suma de los límites configurados (Ollama 6 GB + Qdrant 2 GB + backend 3 GB + proxy 256 MB ≈ 11.3 GB) sigue dentro del presupuesto de 24 GB, pero el uso real bajo carga concurrente todavía no se ha medido — sigue siendo parte del spike pendiente de la Sección 6.
 
 ---
 
@@ -90,6 +93,10 @@ Todo en **una sola VM Ampere A1** para el MVP (no varias VMs orquestadas) — si
 | **Base de usuarios/auth** | PostgreSQL + JWT | Necesario por el requerimiento multiusuario concurrente con login ([requerimientos_usuario.md §6](requerimientos_usuario.md)). Postgres es liviano en modo single-instance para un MVP con pocos usuarios. |
 | **Frontend** | React + Vite + TypeScript, compilado a estáticos | Decisión final (2026-09-23). La interfaz es **estructurada, no chat simple**: filtro por área del derecho, panel de respuesta separado del panel de fragmentos citados, disclaimer de IA siempre visible. Implementado y validado en `frontend/`. |
 | **Reverse proxy / TLS** | Caddy (TLS automático) | Único punto expuesto al exterior — sirve los estáticos del frontend Y hace reverse proxy de `/api/*` al backend, coherente con el aislamiento de red ya definido en [security_checklist.md §1.3](security_checklist.md). El backend ya no publica puerto directo al host. |
+| **STT (voz a texto)** | `faster-whisper` (modelo `small`, CPU, cuantizado int8) | Open source, autoalojado — el audio nunca sale de nuestra infraestructura (decisión 2026-09-23, ver [requerimientos_usuario.md §3.4](requerimientos_usuario.md)). Verificado end-to-end en local antes de integrarlo (ver [spike_resultados.md](spike_resultados.md)). |
+| **TTS (texto a voz)** | Piper, voz `es_MX-claude-high` | Motor de síntesis open source, ligero en CPU, con voz en español mexicano ya verificada como real y descargable. Corre como subproceso dentro del contenedor del backend. |
+| **Subida de documentos** | `pypdf` + `python-docx` para extracción, colección Qdrant separada (`session_documents`) filtrada por `session_id` | Consulta ad-hoc **temporal y aislada por sesión** (decisión 2026-09-23) — nunca se mezcla con el corpus legal permanente ni es visible entre usuarios. |
+| **Generación de documentos** | Plantillas Jinja2 + `python-docx` para exportar `.docx` | Solo el mecanismo extensible por ahora (sin plantillas legales reales todavía) — agregar un caso nuevo no requiere tocar el resto del sistema. |
 
 ### 3.2 Orquestación de ingesta del corpus
 
@@ -151,5 +158,7 @@ Esta arquitectura debe cumplir el hardening ya documentado en [security_checklis
 - **Embeddings:** modelo multilingüe HuggingFace liviano (ej. multilingual-e5-small).
 - **Vector DB:** Qdrant.
 - **Backend:** FastAPI + PostgreSQL (auth) + JWT.
-- **Frontend:** React + Vite + TypeScript, servido por Caddy en la misma VM (mismo dominio que la API, sin CORS) — interfaz estructurada con filtro por área del derecho y paneles separados (respuesta / fragmentos citados / disclaimer). Implementado y validado localmente.
-- **Pendiente antes de construir:** spike técnico de 4 puntos (Sección 6).
+- **Frontend:** React + Vite + TypeScript, servido por Caddy en la misma VM (mismo dominio que la API, sin CORS) — interfaz estructurada con filtro por área del derecho, tema claro/oscuro, tamaño de texto ajustable y diseño responsive. Implementado y validado localmente.
+- **Voz:** Whisper (`faster-whisper`) y Piper autoalojados, sin enviar audio a terceros. Implementado y validado localmente.
+- **Documentos:** subida ad-hoc temporal (aislada por sesión, no permanente) + mecanismo extensible de generación de `.docx` (sin plantillas legales reales todavía). Implementado y validado localmente.
+- **Pendiente antes de construir en producción:** spike técnico de 4 puntos (Sección 6) — ahora con mayor urgencia dado que el backend creció considerablemente en dependencias y uso de RAM.

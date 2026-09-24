@@ -6,6 +6,7 @@ volumes:
   ollama_data:
   qdrant_data:
   postgres_data:
+  piper_models:
 
 services:
   ollama:
@@ -64,14 +65,20 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: "6333"
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-small}
     # Sin puerto publicado al host: ahora solo es alcanzable vía el proxy (/api/*),
     # conforme al principio de "un único punto de entrada" de security_checklist.md §1.3.
     # Para depurar el backend directamente en local, descomenta:
     # ports:
     #   - "8000:8000"
+    volumes:
+      - piper_models:/app/models/piper
     networks:
       - rag_internal
-    mem_limit: 1g
+    # Subido de 1g a 3g: ahora el backend también carga el modelo de embeddings, el
+    # modelo de Whisper (STT) y ejecuta Piper (TTS) en el mismo contenedor. Pendiente
+    # de medir el uso real en la VM de Oracle Cloud (ver arquitectura.md §2.2).
+    mem_limit: 3g
     restart: unless-stopped
 
   proxy:

@@ -45,10 +45,18 @@ Prioridad de diseño: **minimizar alucinación**. El fragmento textual con su fu
 
 Toda respuesta generada por el sistema debe incluir un aviso visible indicando que se trata de contenido generado por IA, que puede contener errores, y que debe ser verificado antes de su uso profesional. Este requerimiento es consistente con la limitación de responsabilidad ya redactada en [aviso_privacidad.md, Sección 2](aviso_privacidad.md) y debe implementarse a nivel de UI (no solo como texto legal en un documento aparte).
 
-### 3.3 Fuera de alcance del MVP (roadmap futuro)
+### 3.3 Generación de documentos/escritos
 
-- **Generación de documentos/escritos** (ej. formularios llenables para una demanda alimenticia) a partir de los datos recabados en la consulta.
-- Esta funcionalidad se identificó como valiosa y **debe considerarse en el diseño de la arquitectura** (para no bloquear su implementación futura), pero no es un entregable bloqueante del MVP inicial.
+Actualización 2026-09-23: se implementó el **mecanismo** de generación de documentos (registro de plantillas + formulario dinámico + exportación a `.docx`), pero **sin ningún caso legal real todavía** — solo una plantilla de prueba ficticia para validar el mecanismo end-to-end (ver [manual_ingenieria_software.md §6.3](manual_ingenieria_software.md)). Completar un caso real (ej. demanda alimenticia) requiere redacción y revisión por un abogado antes de agregarse como plantilla.
+
+### 3.4 Funciones adicionales de la interfaz (2026-09-23)
+
+A petición del Product Owner, se ampliaron los requerimientos de interfaz:
+
+- **Responsive y personalizable**: la interfaz debe adaptarse a distintos tamaños de pantalla, y permitir al usuario ajustar tema (claro/oscuro) y tamaño de texto a su preferencia.
+- **Subir documentos**: el abogado puede adjuntar un documento (PDF/DOCX/TXT) para preguntar sobre él en esa sesión — de forma **temporal y aislada por sesión**, sin indexarse en el corpus legal permanente ni ser visible para otros usuarios.
+- **Copiar/pegar**: botones para copiar la respuesta y cada fragmento citado al portapapeles.
+- **Chat por voz**: dictado de la pregunta por micrófono y reproducción hablada de la respuesta, usando modelos **autoalojados y open source** (no un servicio de voz de un tercero), para no romper el compromiso de privacidad de [aviso_privacidad.md](aviso_privacidad.md).
 
 ---
 
