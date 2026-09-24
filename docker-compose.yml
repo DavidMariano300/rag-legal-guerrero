@@ -1,0 +1,72 @@
+networks:
+  rag_internal:
+    driver: bridge
+
+volumes:
+  ollama_data:
+  qdrant_data:
+  postgres_data:
+
+services:
+  ollama:
+    image: ollama/ollama:0.3.14
+    container_name: rag_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - rag_internal
+    mem_limit: 6g
+    restart: unless-stopped
+    # Puerto expuesto al host SOLO para depuración del spike local (remapeado a 11435
+    # porque el host ya tiene una instalación nativa de Ollama usando el 11434).
+    # En producción (Oracle Cloud) este servicio debe permanecer en red interna.
+    ports:
+      - "11435:11434"
+
+  qdrant:
+    image: qdrant/qdrant:v1.11.3
+    container_name: rag_qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - rag_internal
+    mem_limit: 2g
+    restart: unless-stopped
+    # Igual que ollama: solo para depuración local del spike.
+    ports:
+      - "6333:6333"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rag_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rag_internal
+    mem_limit: 512m
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: rag_backend
+    depends_on:
+      - ollama
+      - qdrant
+      - postgres
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+    ports:
+      - "8000:8000"
+    networks:
+      - rag_internal
+    mem_limit: 1g
+    restart: unless-stopped
