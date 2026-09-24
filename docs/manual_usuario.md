@@ -1,7 +1,7 @@
 # Manual de Usuario — RAG Legal Guerrero
 
 **Para:** Edgar David Mariano Ruiz (Product Owner)
-**Estado:** Borrador anticipado — el producto todavía está en fase de prototipo técnico (spike), por lo que este manual describe el funcionamiento **previsto** de la herramienta y se actualizará en cuanto exista una interfaz visual real para probarla.
+**Estado:** Borrador — ya existe una interfaz visual funcional (React) validada en entorno local, con formulario de consulta, filtro por área del derecho, y paneles de respuesta/fragmentos/disclaimer tal como se describe abajo. Aún no está desplegada en la nube ni tiene inicio de sesión, así que las secciones sobre autenticación y disponibilidad pública siguen siendo previsión, no realidad todavía.
 **Última actualización:** 2026-09-23
 **Documentos relacionados:** [aviso_privacidad.md](aviso_privacidad.md) (léelo completo antes de usar la herramienta con datos reales de clientes)
 
@@ -62,7 +62,7 @@ Cuando uses la herramienta con casos reales:
 
 Este manual describe el funcionamiento **previsto** del producto terminado. Al día de hoy (2026-09-23):
 
-- El sistema existe como un prototipo técnico (backend) — **todavía no hay una interfaz visual (pantalla) para usarlo** como aquí se describe.
+- Ya existe una interfaz visual funcional (formulario, filtro por área, paneles de respuesta/fragmentos), pero **solo probada en entorno local de desarrollo** — todavía no está publicada en un enlace accesible desde internet.
 - El corpus indexado actualmente son **datos de prueba ficticios**, no legislación real — ver `fixtures/sample_corpus.md` en el repositorio.
 - No existe todavía inicio de sesión (login) ni gestión de múltiples usuarios.
 

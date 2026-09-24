@@ -24,8 +24,23 @@ def parse_articles(raw_text: str) -> list[dict]:
         chunk = chunk.strip()
         if not chunk.startswith("## "):
             continue
-        title_line, _, body = chunk.partition("\n")
-        articles.append({"fuente": title_line.replace("## ", "").strip(), "texto": body.strip()})
+        title_line, _, rest = chunk.partition("\n")
+        rest = rest.strip()
+
+        area = "Sin clasificar"
+        area_match = re.match(r"Área:\s*(.+)", rest)
+        if area_match:
+            area = area_match.group(1).strip()
+            _, _, rest = rest.partition("\n")
+            rest = rest.strip()
+
+        articles.append(
+            {
+                "fuente": title_line.replace("## ", "").strip(),
+                "area": area,
+                "texto": rest,
+            }
+        )
     return articles
 
 
@@ -46,7 +61,7 @@ def main() -> None:
             qmodels.PointStruct(
                 id=idx,
                 vector=vector,
-                payload={"texto": article["texto"], "fuente": article["fuente"]},
+                payload={"texto": article["texto"], "fuente": article["fuente"], "area": article["area"]},
             )
         )
 

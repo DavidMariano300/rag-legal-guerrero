@@ -64,9 +64,26 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: "6333"
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
-    ports:
-      - "8000:8000"
+    # Sin puerto publicado al host: ahora solo es alcanzable vía el proxy (/api/*),
+    # conforme al principio de "un único punto de entrada" de security_checklist.md §1.3.
+    # Para depurar el backend directamente en local, descomenta:
+    # ports:
+    #   - "8000:8000"
     networks:
       - rag_internal
     mem_limit: 1g
+    restart: unless-stopped
+
+  proxy:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: rag_proxy
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks:
+      - rag_internal
+    mem_limit: 256m
     restart: unless-stopped

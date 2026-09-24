@@ -48,14 +48,21 @@ def ensure_collection(vector_size: int) -> None:
         )
 
 
-def retrieve(question: str) -> list[dict]:
+def retrieve(question: str, area: str | None = None) -> list[dict]:
     embedder = get_embedder()
     query_vector = embedder.encode(f"query: {question}").tolist()
+
+    query_filter = None
+    if area:
+        query_filter = qmodels.Filter(
+            must=[qmodels.FieldCondition(key="area", match=qmodels.MatchValue(value=area))]
+        )
 
     client = get_qdrant()
     hits = client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vector,
+        query_filter=query_filter,
         limit=TOP_K,
     ).points
 
@@ -63,6 +70,7 @@ def retrieve(question: str) -> list[dict]:
         {
             "texto": hit.payload.get("texto"),
             "fuente": hit.payload.get("fuente"),
+            "area": hit.payload.get("area"),
             "score": hit.score,
         }
         for hit in hits
@@ -89,8 +97,8 @@ def generate_answer(question: str, fragments: list[dict]) -> str:
         return response.json().get("response", "").strip()
 
 
-def answer_query(question: str) -> dict:
-    fragments = retrieve(question)
+def answer_query(question: str, area: str | None = None) -> dict:
+    fragments = retrieve(question, area)
     respuesta_conversacional = generate_answer(question, fragments) if fragments else (
         "No se encontró contexto relevante en el corpus indexado para esta pregunta."
     )

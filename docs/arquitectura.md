@@ -88,8 +88,8 @@ Todo en **una sola VM Ampere A1** para el MVP (no varias VMs orquestadas) — si
 | **Vector DB** | Qdrant | Open source, imagen oficial ARM64, buen soporte de filtros por metadata (útil para la interfaz estructurada por área del derecho — [requerimientos_usuario.md §6](requerimientos_usuario.md)), footprint razonable en RAM. |
 | **Backend** | Python + FastAPI | Estándar para servir APIs RAG, fácil integración con LangChain/LlamaIndex si se decide usar un framework de orquestación, o implementación directa. |
 | **Base de usuarios/auth** | PostgreSQL + JWT | Necesario por el requerimiento multiusuario concurrente con login ([requerimientos_usuario.md §6](requerimientos_usuario.md)). Postgres es liviano en modo single-instance para un MVP con pocos usuarios. |
-| **Frontend** | SPA ligera (ej. React/Vite o Svelte) servida como estático | La interfaz debe ser **estructurada, no chat simple** — filtros por área del derecho, panel de fragmentos citados separado de la respuesta conversacional. |
-| **Reverse proxy / TLS** | Caddy (TLS automático) | Único punto expuesto al exterior, coherente con el aislamiento de red ya definido en [security_checklist.md §1.3](security_checklist.md). |
+| **Frontend** | React + Vite + TypeScript, compilado a estáticos | Decisión final (2026-09-23). La interfaz es **estructurada, no chat simple**: filtro por área del derecho, panel de respuesta separado del panel de fragmentos citados, disclaimer de IA siempre visible. Implementado y validado en `frontend/`. |
+| **Reverse proxy / TLS** | Caddy (TLS automático) | Único punto expuesto al exterior — sirve los estáticos del frontend Y hace reverse proxy de `/api/*` al backend, coherente con el aislamiento de red ya definido en [security_checklist.md §1.3](security_checklist.md). El backend ya no publica puerto directo al host. |
 
 ### 3.2 Orquestación de ingesta del corpus
 
@@ -151,5 +151,5 @@ Esta arquitectura debe cumplir el hardening ya documentado en [security_checklis
 - **Embeddings:** modelo multilingüe HuggingFace liviano (ej. multilingual-e5-small).
 - **Vector DB:** Qdrant.
 - **Backend:** FastAPI + PostgreSQL (auth) + JWT.
-- **Frontend:** SPA ligera con interfaz estructurada (paneles separados: respuesta / fragmentos citados / disclaimer).
+- **Frontend:** React + Vite + TypeScript, servido por Caddy en la misma VM (mismo dominio que la API, sin CORS) — interfaz estructurada con filtro por área del derecho y paneles separados (respuesta / fragmentos citados / disclaimer). Implementado y validado localmente.
 - **Pendiente antes de construir:** spike técnico de 4 puntos (Sección 6).

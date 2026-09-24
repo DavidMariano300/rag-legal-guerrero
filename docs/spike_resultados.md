@@ -29,7 +29,18 @@ Esto confirma que el diseño de la Sección 6 de [arquitectura.md](arquitectura.
 
 El contenedor del backend corre como usuario no-root (`appuser`, principio de menor privilegio — [security_checklist.md §1.2](security_checklist.md)), pero el `Dockerfile` inicial no le creaba un directorio "home", lo que hacía fallar la descarga del modelo de embeddings de HuggingFace (necesita un directorio de caché con permisos de escritura). Se corrigió creando explícitamente el home de `appuser` y fijando `HF_HOME` a una ruta dentro de ese home. Ver `backend/Dockerfile`.
 
-## 4. Pendiente (no cubierto por este spike local)
+## 4. Segunda ronda: frontend + filtro por área del derecho (2026-09-23)
+
+Se agregó el frontend (React + Vite + TypeScript) servido por Caddy, que ahora es el único punto de entrada público del stack (el backend dejó de publicar su puerto al host, conforme a [security_checklist.md §1.3](security_checklist.md)). Se etiquetó el corpus de prueba con un campo `Área:` y se implementó el filtro correspondiente en Qdrant (`backend/app/rag.py`).
+
+**Prueba realizada:** la pregunta "¿Cuánto dura la detención antes de resolver la situación jurídica?" (temática penal) se probó dos veces:
+
+- **Sin filtro:** el sistema recuperó correctamente el artículo de materia Penal como más relevante (score 0.90).
+- **Con filtro "Laboral":** el sistema excluyó correctamente el artículo Penal (aunque era el más similar) y, al no tener contexto relevante en el área filtrada, **respondió honestamente que no tenía la información** en vez de inventarla — el comportamiento anti-alucinación deseado.
+
+Se verificó también visualmente en navegador (`http://localhost:8080`) que la interfaz muestra correctamente los tres paneles (respuesta, fragmentos citados con fuente/área/score, disclaimer).
+
+## 5. Pendiente (no cubierto por este spike local)
 
 - [ ] **Validación en ARM64 real** sobre una VM Oracle Cloud Always Free — este spike corrió en x86_64, no confirma compatibilidad de imágenes ni desempeño real en Ampere A1.
 - [ ] **Prueba de concurrencia**: no se probó con múltiples usuarios simultáneos.

@@ -80,6 +80,22 @@ Este diseño no elimina el riesgo de que el LLM interprete mal un fragmento, per
 
 ---
 
+## 6.1 Por qué el frontend es React + Vite + TypeScript, y por qué vive en la misma VM
+
+**Qué es:** React es una librería para construir interfaces web dividiéndolas en piezas reutilizables ("componentes"); Vite es la herramienta que convierte ese código en los archivos HTML/CSS/JS finales que un navegador puede mostrar; TypeScript es una variante de JavaScript que detecta errores de tipos antes de ejecutar el código (por ejemplo, evita que accidentalmente se trate un número como si fuera texto).
+
+**Para qué sirve:** es la pantalla con la que el abogado interactúa — el formulario para preguntar, el filtro por área del derecho, y los paneles donde se muestran la respuesta, los fragmentos citados y el disclaimer.
+
+**Por qué se eligió así:**
+- React + Vite es la combinación más estándar y documentada para este tipo de interfaz, lo que facilita que cualquier futuro colaborador (aunque no haya trabajado en este proyecto) entienda el código rápido.
+- TypeScript reduce errores silenciosos, algo valioso en una herramienta donde mostrar mal un dato (ej. confundir el fragmento citado con la respuesta generada) tiene implicaciones legales, no solo estéticas.
+- Se decidió **no** alojar el frontend en un servicio externo (ej. GitHub Pages, Vercel) y en su lugar servirlo desde la misma VM de Oracle Cloud, a través de Caddy (el mismo "portero" que ya filtra el tráfico hacia el backend). Esto evita el problema técnico de CORS (cuando el navegador bloquea peticiones entre dos dominios distintos por seguridad) y evita depender de una segunda cuenta/servicio gratuito con sus propios límites y posibles cambios de política.
+- El frontend se compila ("build") a archivos estáticos (HTML/CSS/JS ya listos) dentro de una imagen Docker de Caddy — no corre un servidor Node.js en producción, solo se sirven archivos, lo cual es más liviano y seguro (menos superficie de ataque).
+
+Ver `frontend/Dockerfile` (build en dos etapas: una que compila con Node, otra que solo sirve los archivos ya compilados con Caddy) y `frontend/Caddyfile` (las reglas de enrutamiento: todo lo que empieza con `/api/` va al backend, el resto sirve la interfaz).
+
+---
+
 ## 7. Buenas prácticas de programación aplicadas (y por qué importan)
 
 Esta sección explica prácticas que cualquier persona con experiencia en desarrollo de software da por sentadas, pero que no son obvias si nunca se ha programado en equipo.
@@ -129,9 +145,15 @@ rag-legal-guerrero/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py                    # Define los endpoints de la API (ej. /query)
+│       ├── main.py                    # Define los endpoints de la API (ej. /api/query)
 │       ├── rag.py                     # Lógica de recuperación + generación
 │       └── ingest.py                  # Script para cargar documentos al vector DB
+├── frontend/
+│   ├── Dockerfile                     # Build de dos etapas: compila con Node, sirve con Caddy
+│   ├── Caddyfile                      # Enrutamiento: /api/* → backend, resto → interfaz
+│   └── src/
+│       ├── App.tsx                    # Interfaz: filtro por área, formulario, paneles de resultado
+│       └── api.ts                     # Llamadas a la API del backend
 └── fixtures/
     └── sample_corpus.md               # Datos FICTICIOS solo para pruebas locales
 ```
@@ -229,8 +251,8 @@ El proyecto se distribuye bajo licencia **Apache 2.0** ([LICENSE](../LICENSE)), 
 
 - [ ] Ejecutar y documentar resultados del spike técnico en una VM real de Oracle Cloud (ARM64) — ver [arquitectura.md §6](arquitectura.md).
 - [ ] Definir e implementar el sourcing real del corpus legal ([requerimientos_usuario.md §4](requerimientos_usuario.md)).
-- [ ] Implementar autenticación multiusuario real (actualmente el backend del spike no tiene login).
-- [ ] Construir el frontend estructurado (actualmente solo existe el backend vía API).
+- [ ] Implementar autenticación multiusuario real (actualmente el backend del spike no tiene login, y el frontend no tiene pantalla de inicio de sesión).
+- [x] Construir el frontend estructurado — implementado en `frontend/` (React + Vite + TS, servido vía Caddy) y validado end-to-end en local.
 - [ ] Definir y automatizar pruebas (tests) — no existen todavía.
 - [ ] Definir pipeline de CI/CD (integración/despliegue continuo) en GitHub Actions.
 - [ ] Completar los campos pendientes `[...]` en `aviso_privacidad.md` y en las plantillas de la Sección 9 de este manual, con revisión legal formal.
