@@ -1,10 +1,9 @@
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { borrarDocumentosSesion, subirDocumento } from "../api";
 
 interface Props {
   sessionId: string;
-  usarDocumentos: boolean;
-  setUsarDocumentos: (v: boolean) => void;
+  onHasDocuments: (hasDocuments: boolean) => void;
 }
 
 interface ArchivoSubido {
@@ -12,11 +11,16 @@ interface ArchivoSubido {
   fragmentos_indexados: number;
 }
 
-export default function DocumentUpload({ sessionId, usarDocumentos, setUsarDocumentos }: Props) {
+export default function DocumentUpload({ sessionId, onHasDocuments }: Props) {
   const [archivos, setArchivos] = useState<ArchivoSubido[]>([]);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onHasDocuments(archivos.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archivos]);
 
   async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -27,7 +31,6 @@ export default function DocumentUpload({ sessionId, usarDocumentos, setUsarDocum
     try {
       const resultado = await subirDocumento(sessionId, file);
       setArchivos((prev) => [...prev, resultado]);
-      setUsarDocumentos(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir el documento.");
     } finally {
@@ -36,47 +39,55 @@ export default function DocumentUpload({ sessionId, usarDocumentos, setUsarDocum
     }
   }
 
-  async function handleClearAll() {
+  async function quitarArchivo(filename: string) {
+    if (archivos.length === 1) {
+      await borrarDocumentosSesion(sessionId).catch(() => null);
+      setArchivos([]);
+      return;
+    }
+    // Con un solo documento a la vez alcanza para el MVP; si hay varios, se limpian todos.
     await borrarDocumentosSesion(sessionId).catch(() => null);
-    setArchivos([]);
-    setUsarDocumentos(false);
+    setArchivos((prev) => prev.filter((a) => a.filename !== filename));
   }
 
   return (
-    <div className="field">
-      <span>Documentos de esta consulta (opcional)</span>
-
-      <input ref={inputRef} type="file" accept=".pdf,.docx,.txt" onChange={handleFileChange} disabled={subiendo} />
-
-      {error && <div className="error-panel">{error}</div>}
+    <div className="attach-control">
+      <button
+        type="button"
+        className="icon-button"
+        onClick={() => inputRef.current?.click()}
+        disabled={subiendo}
+        aria-label="Adjuntar documento"
+        title="Adjuntar documento (PDF, Word o texto)"
+      >
+        {subiendo ? "..." : "📎"}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.docx,.txt"
+        onChange={handleFileChange}
+        style={{ display: "none" }}
+      />
 
       {archivos.length > 0 && (
-        <>
-          <div className="upload-list">
-            {archivos.map((a, idx) => (
-              <div className="upload-item" key={idx}>
-                <span>
-                  {a.filename} ({a.fragmentos_indexados} fragmentos)
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <label className="checkbox-row">
-            <input type="checkbox" checked={usarDocumentos} onChange={(e) => setUsarDocumentos(e.target.checked)} />
-            Incluir estos documentos en la búsqueda
-          </label>
-
-          <button type="button" className="copy-button" onClick={handleClearAll}>
-            Quitar todos los documentos de esta sesión
-          </button>
-        </>
+        <div className="attach-chips">
+          {archivos.map((a) => (
+            <span className="chip" key={a.filename} title={`${a.fragmentos_indexados} fragmentos indexados`}>
+              📄 {a.filename}
+              <button type="button" onClick={() => quitarArchivo(a.filename)} aria-label={`Quitar ${a.filename}`}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
       )}
 
-      <small style={{ color: "var(--muted)" }}>
-        Los documentos subidos solo se usan en esta sesión de tu navegador, no se agregan al corpus legal
-        permanente ni son visibles para otros usuarios.
-      </small>
+      {error && (
+        <div className="error-panel" style={{ marginTop: "0.5rem" }}>
+          {error}
+        </div>
+      )}
     </div>
   );
 }

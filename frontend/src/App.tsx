@@ -23,7 +23,7 @@ export default function App() {
 
   const [pregunta, setPregunta] = useState("");
   const [area, setArea] = useState("");
-  const [usarDocumentos, setUsarDocumentos] = useState(false);
+  const [hasDocuments, setHasDocuments] = useState(false);
   const [resultado, setResultado] = useState<QueryResponse | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export default function App() {
     setResultado(null);
 
     try {
-      const data = await consultar(pregunta.trim(), area, sessionId, usarDocumentos);
+      const data = await consultar(pregunta.trim(), area, sessionId, hasDocuments);
       setResultado(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
@@ -74,24 +74,24 @@ export default function App() {
           </select>
         </label>
 
-        <label className="field">
-          <span>Tu pregunta</span>
-          <div className="question-row">
-            <textarea
-              value={pregunta}
-              onChange={(e) => setPregunta(e.target.value)}
-              placeholder="Ej. ¿Cuál es el plazo para contestar una demanda civil?"
-              rows={3}
-            />
-            <VoiceControls onTranscribed={(texto) => setPregunta((prev) => (prev ? `${prev} ${texto}` : texto))} />
+        <div className="composer">
+          <textarea
+            value={pregunta}
+            onChange={(e) => setPregunta(e.target.value)}
+            placeholder="Ej. ¿Cuál es el plazo para contestar una demanda civil?"
+            rows={3}
+          />
+
+          <div className="composer-toolbar">
+            <div className="composer-toolbar-left">
+              <DocumentUpload sessionId={sessionId} onHasDocuments={setHasDocuments} />
+              <VoiceControls onTranscribed={(texto) => setPregunta((prev) => (prev ? `${prev} ${texto}` : texto))} />
+            </div>
+            <button type="submit" className="primary-button" disabled={cargando || !pregunta.trim()}>
+              {cargando ? "Consultando..." : "Consultar"}
+            </button>
           </div>
-        </label>
-
-        <DocumentUpload sessionId={sessionId} usarDocumentos={usarDocumentos} setUsarDocumentos={setUsarDocumentos} />
-
-        <button type="submit" className="primary-button" disabled={cargando || !pregunta.trim()}>
-          {cargando ? "Consultando..." : "Consultar"}
-        </button>
+        </div>
       </form>
 
       {error && <div className="error-panel">{error}</div>}
@@ -126,10 +126,10 @@ export default function App() {
           </section>
 
           <div className="result-disclaimer">{resultado.disclaimer}</div>
+
+          <DocumentGenerator />
         </div>
       )}
-
-      <DocumentGenerator />
     </div>
   );
 }

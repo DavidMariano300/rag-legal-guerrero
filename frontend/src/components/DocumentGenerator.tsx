@@ -3,6 +3,7 @@ import { generarDocumento, listarPlantillas, Plantilla } from "../api";
 
 export default function DocumentGenerator() {
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
+  const [expandido, setExpandido] = useState(false);
   const [seleccionada, setSeleccionada] = useState<string>("");
   const [valores, setValores] = useState<Record<string, string>>({});
   const [generando, setGenerando] = useState(false);
@@ -42,9 +43,25 @@ export default function DocumentGenerator() {
 
   if (plantillas.length === 0) return null;
 
+  if (!expandido) {
+    return (
+      <div className="doc-suggestion">
+        <span>💡 ¿Quieres generar un documento con esta información?</span>
+        <button type="button" className="copy-button" onClick={() => setExpandido(true)}>
+          Generar documento
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <section className="panel" style={{ marginTop: "1.5rem" }}>
-      <h2>Generar documento (mecanismo de prueba)</h2>
+    <section className="panel">
+      <div className="panel-header">
+        <h2>Generar documento (mecanismo de prueba)</h2>
+        <button type="button" className="copy-button" onClick={() => setExpandido(false)}>
+          Cerrar
+        </button>
+      </div>
       <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
         Esto genera un documento .docx de ejemplo para validar el mecanismo. Todavía no incluye plantillas de
         documentos legales reales.

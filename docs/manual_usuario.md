@@ -30,9 +30,9 @@ Por esto, **cada respuesta del sistema incluye un aviso de que fue generada por 
 
 - **Preferencias (⚙ arriba a la derecha):** puedes cambiar entre tema claro/oscuro y ajustar el tamaño de texto a tu gusto; la interfaz también se adapta a pantallas de celular/tablet.
 - **Copiar:** cada respuesta y cada fragmento citado tiene un botón para copiarlo directamente al portapapeles.
-- **Subir un documento:** puedes adjuntar un PDF, Word o texto (máx. 15 MB) para preguntar sobre ese documento en particular (ej. un contrato). Es **temporal**: solo dura mientras tengas la pestaña abierta, no se agrega al corpus legal general ni lo ve ningún otro usuario.
-- **Voz:** puedes dictar tu pregunta con el botón del micrófono (🎤) y escuchar la respuesta en voz alta (🔊 Escuchar). Todo el procesamiento de voz ocurre en nuestra propia infraestructura, nunca se envía a un servicio externo.
-- **Generar documento:** al final de la página hay un mecanismo para generar documentos `.docx` a partir de una plantilla. **Importante:** por ahora solo existe una plantilla de prueba ficticia para validar que el mecanismo funciona — todavía no hay ninguna plantilla de un documento legal real disponible.
+- **Subir un documento (📎, junto al cuadro de pregunta):** adjunta un PDF, Word o texto (máx. 15 MB) para preguntar sobre ese documento en particular (ej. un contrato); aparece como una pequeña etiqueta con su nombre, con una ✕ para quitarlo. Es **temporal**: solo dura mientras tengas la pestaña abierta, no se agrega al corpus legal general ni lo ve ningún otro usuario.
+- **Voz (🎤, junto al cuadro de pregunta):** dicta tu pregunta con el micrófono, y escucha la respuesta en voz alta con el botón 🔊 Escuchar que aparece junto a cada respuesta. Todo el procesamiento de voz ocurre en nuestra propia infraestructura, nunca se envía a un servicio externo.
+- **Generar documento:** después de recibir una respuesta, si aplica, aparece una sugerencia ("💡 ¿Quieres generar un documento con esta información?") — solo se muestra el formulario si la abres. **Importante:** por ahora solo existe una plantilla de prueba ficticia para validar que el mecanismo funciona — todavía no hay ninguna plantilla de un documento legal real disponible.
 
 ## 3. Cómo se ve una respuesta
 
