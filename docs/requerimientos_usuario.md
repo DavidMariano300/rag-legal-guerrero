@@ -62,7 +62,28 @@ A petición del Product Owner, se ampliaron los requerimientos de interfaz:
 
 ## 4. Corpus documental (fuentes de datos)
 
-**Estado actual: pendiente de definir.** No se cuenta todavía con las fuentes digitalizadas. Requerimientos para cuando se defina el sourcing:
+**Estado actual (2026-10-10): legislación estatal de Guerrero ingerida.** Además de la Ley Federal del
+Trabajo (1,264 artículos, Cámara de Diputados), se indexó **todo lo publicado en el portal de
+legislación del H. Congreso del Estado** (https://congresogro.gob.mx/legislacion/): Constitución
+Política, 7 códigos, leyes orgánicas y ordinarias. Son 153 de 154 documentos y 21,401 fragmentos (los
+artículos de más de 2,000 caracteres se parten por párrafos).
+
+- Comando: `python -m app.ingest_leyes catalogo` regenera el catálogo
+  (`backend/app/corpus/catalogo_guerrero.csv`: número, nombre, área, URL); `python -m app.ingest_leyes`
+  ingiere lo que diga el CSV. Re-ejecutable: borra los fragmentos de cada ley antes de volver a cargarla.
+- Cada fragmento lleva la fecha de última reforma que declara el propio PDF, y la cita la muestra.
+- Excluidos: la Ley Orgánica del Poder Legislativo 286 (marcada ABROGADA en el portal) y la Ley 47 de
+  Fomento Industrial (numera sus artículos con palabras: "ARTICULO PRIMERO").
+- **Para revisión de un abogado:**
+  - El **área** de cada ley en el CSV se asignó por heurística sobre el nombre; 116 leyes cayeron en
+    "Administrativo y Fiscal" por defecto.
+  - Vigencia: el Código 215 parece sustituido por el 763, y el Código Procesal Civil 364 está en
+    transición al Código Nacional de Procedimientos Civiles y Familiares.
+  - Algunos PDF de 2021 pueden no traer las reformas más recientes.
+- Siguen pendientes las leyes federales que aplican en Guerrero (Constitución federal, CNPP, Ley de
+  Amparo, Código Nacional de Procedimientos Civiles y Familiares) y la jurisprudencia.
+
+Requerimientos para cuando se amplíe el sourcing:
 
 - Las fuentes deben tener **respaldo oficial y verificable**, por ejemplo:
   - Periódico Oficial del Estado de Guerrero (legislación estatal)

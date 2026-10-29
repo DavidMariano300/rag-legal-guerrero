@@ -56,7 +56,9 @@ Marca cada ítem como `[ ]` pendiente, `[~]` en progreso o `[x]` completado. Est
 - [ ] Limitar el tamaño/cantidad de chunks inyectados en el contexto para reducir superficie de ataque y controlar costos.
 
 ### 2.3 Diseño del prompt y del modelo
-- [ ] Usar un system prompt robusto que defina explícitamente el rol ("asistente de investigación legal, no eres un abogado, no tomas decisiones"), los límites de la tarea y qué hacer ante instrucciones sospechosas.
+- [x] **Cerrado 2026-09-24:** system prompt robusto que define el rol, exige responder solo con el contexto proporcionado, y exige un rechazo explícito cuando el contexto no corresponde a la materia preguntada (`backend/app/rag.py`, `SYSTEM_PROMPT`) — mitiga alucinación por desajuste entre la pregunta y un corpus incompleto. Validado con preguntas fuera del corpus (ver [spike_resultados.md §5.3](spike_resultados.md)). **Limitación conocida:** el modelo pequeño (`llama3.2:3b`) rechaza correctamente pero no siempre usa la frase exacta pedida — no depender de un match de string exacto para detectar rechazos de forma automatizada.
+- [x] **Cerrado 2026-10-10:** verificación determinista de la salida. Cada cita entre comillas de la respuesta debe aparecer literalmente en el fragmento del artículo que se cita; si no, se sustituye por el rechazo y la API devuelve `respaldada=false` (`rag.verificar_citas`, tests en `tests/test_verificar_citas.py`). Las cifras de aguinaldo, vacaciones y prima se calculan en Python, no en el LLM (`calculos.py`). **Limitación conocida:** no detecta un artículo real aplicado al supuesto equivocado; ver [refactorizacion_rag.md §8](refactorizacion_rag.md).
+- [x] **Cerrado 2026-10-10:** `/api/query` responde 503 (no un 500 sin manejar) cuando Ollama no responde a tiempo.
 - [ ] Evaluar el uso de un modelo separado y más pequeño (o reglas heurísticas) como "guardia" (guardrail) que analice el input del usuario y el contexto recuperado antes de pasarlo al LLM principal, buscando patrones de inyección conocidos.
 - [ ] No permitir que la salida del LLM ejecute acciones automáticamente (function calling / tool use) sin validación humana o de reglas — especialmente si en el futuro se agregan herramientas (ej. generación de documentos, envío de correos, consultas a APIs externas).
 - [ ] Si se usa function calling, validar y limitar estrictamente qué funciones puede invocar el modelo y con qué parámetros (allowlist, no ejecución de código arbitrario).
@@ -102,9 +104,9 @@ Marca cada ítem como `[ ]` pendiente, `[~]` en progreso o `[x]` completado. Est
 - [x] Lista blanca de extensiones (`.pdf`, `.docx`, `.txt`) — cualquier otra se rechaza.
 - [x] El archivo original nunca se persiste en disco, solo el texto ya extraído.
 - [x] Aislamiento por sesión: un documento subido solo es recuperable con el mismo `session_id`, nunca cruza entre usuarios (ver `retrieve_session_fragments`).
-- [ ] **Pendiente:** no hay expiración automática de los documentos de una sesión — hoy solo se borran si el usuario pulsa "Quitar todos los documentos" o vía `DELETE /api/documents/{session_id}`. Evaluar un job de limpieza periódico antes de producción.
+- [x] **Cerrado 2026-09-23:** expiración automática — `iniciar_limpieza_periodica()` corre cada `SESSION_CLEANUP_INTERVAL_SECONDS` (1h por defecto) y purga documentos con más de `SESSION_DOCUMENT_TTL_SECONDS` (24h por defecto) de antigüedad.
 - [ ] **Pendiente:** no se escanea el contenido extraído con un antivirus/sandbox — el texto extraído se trata como no confiable a nivel de prompt (sección 2), pero no hay una capa de escaneo de malware sobre el binario original antes de descartarlo.
-- [ ] **Pendiente:** no hay rate limiting específico sobre el endpoint de subida — un usuario podría subir archivos repetidamente para agotar espacio en Qdrant o CPU de embeddings.
+- [x] **Cerrado 2026-09-23:** rate limiting de 10/minuto sobre `/api/documents/upload` (ver sección 5).
 
 ### 4.2 Generación de documentos (`backend/app/generation.py`)
 - [x] Los valores de los campos del formulario se insertan en el `.docx` vía Jinja2 `Template(...).render(**values)` sobre texto de plantilla fijo definido en el código, no sobre una plantilla controlada por el usuario — el usuario nunca puede inyectar su propia sintaxis Jinja2 como plantilla, solo como valores de campo.
@@ -113,8 +115,37 @@ Marca cada ítem como `[ ]` pendiente, `[~]` en progreso o `[x]` completado. Est
 ### 4.3 Voz (`backend/app/voice.py`)
 - [x] Las llamadas a Piper se hacen con `subprocess.run` pasando argumentos como **lista** (nunca como string concatenado ni `shell=True`), lo que evita inyección de comandos de shell.
 - [x] Timeouts definidos en las llamadas a `subprocess.run` (60-120s) para evitar que un proceso colgado agote recursos indefinidamente.
-- [ ] **Pendiente:** el tamaño/duración máxima del audio subido para transcripción no está limitado explícitamente — un archivo de audio muy largo podría consumir mucho CPU/tiempo en el modelo Whisper. Evaluar un límite de duración o tamaño antes de producción.
+- [x] **Cerrado 2026-09-23:** `validar_duracion_audio()` lee solo los metadatos del contenedor de audio (sin decodificar todo el archivo) y rechaza audios de más de `MAX_AUDIO_DURATION_SECONDS` (120s por defecto).
 - [ ] **Pendiente:** medir el impacto real en RAM del backend con Whisper + Piper + embeddings cargados simultáneamente en la VM ARM64 real (ver `docs/arquitectura.md §2.2`).
+
+---
+
+## 5. Autenticación y rate limiting (agregado 2026-09-23)
+
+### 5.1 Autenticación (`backend/app/auth.py`, `backend/app/models.py`)
+- [x] Contraseñas nunca se guardan en texto plano — hasheadas con `bcrypt` (salt aleatorio por hash, verificado en `tests/test_password_hashing.py`).
+- [x] Sesiones vía JWT firmado (`HS256`) con expiración de 24h — no hay sesiones que vivan para siempre.
+- [x] `JWT_SECRET_KEY` se lee de variable de entorno; si falta, se genera una clave aleatoria **por proceso** con un warning explícito en el log (evita el error más común: una clave hardcodeada en el código fuente). **Antes de producción es obligatorio definir un valor propio en `.env`** — si no, todas las sesiones se invalidan en cada reinicio del backend.
+- [x] Todos los endpoints que exponen datos o consumen cómputo (`/api/query`, `/api/documents/*`, `/api/voice/*`) requieren un JWT válido vía `Depends(get_current_user)`. Verificado en `tests/test_auth.py` (incluye caso de token ausente, token inválido, y acceso exitoso).
+- [ ] **Pendiente:** no hay revocación de tokens (logout del lado servidor) ni refresh tokens — el logout actual solo borra el token en el navegador (`localStorage`), el JWT sigue siendo técnicamente válido hasta su expiración natural si alguien lo capturó antes.
+- [ ] **Pendiente:** no hay verificación de correo electrónico ni recuperación de contraseña.
+
+- [x] Acceso como invitado (`POST /api/auth/invitado`, agregado 2026-10-27) para la demo con abogados: entrega un JWT de 4 h de un usuario compartido (`invitado@amate.invalid`, dominio `.invalid` que `EmailStr` rechaza, así que nadie puede registrarlo ni entrar con contraseña). Limitado a 5/minuto por IP y **desactivado salvo `PERMITIR_INVITADOS=true`** (Docker Compose lo activa por defecto para la demo). Cualquiera con la URL puede consumir cómputo del LLM: desactivarlo cuando haya usuarios reales.
+
+- [x] **Demo pública por túnel (2026-10-27):** el servicio `tunel` (Cloudflare quick tunnel, perfil `demo`) publica
+  SOLO el proxy Caddy; backend, Ollama, Qdrant y Postgres siguen en la red interna. Los puertos de depuración
+  de Ollama (11435) y Qdrant (6333) pasaron de `0.0.0.0` a `127.0.0.1`: antes cualquiera en la misma red
+  Wi-Fi podía usar Ollama o leer y borrar la base vectorial (Qdrant no tiene autenticación).
+
+### 5.2 Rate limiting (`backend/app/rate_limit.py`, vía `slowapi`)
+- [x] Límites aplicados: `/api/auth/login` y `/api/auth/register` 10/min (mitiga fuerza bruta), `/api/query` 20/min, `/api/documents/upload` 10/min, `/api/voice/*` 15/min — todo por dirección IP.
+- [x] **Validado con prueba real:** 12 peticiones consecutivas a `/api/auth/login` → las primeras 10 devuelven 200, la 11 y 12 devuelven 429.
+- **Nota para quien vuelva a probar esto:** el límite es "N por minuto de ventana", no un tope total fijo. Una prueba de ráfaga contra un endpoint LENTO (ej. `/api/query`, que espera la generación real del LLM) puede tardar más de 60 segundos en completarse, dando la falsa impresión de que el límite no funciona cuando en realidad la ventana ya se reinició a mitad de la prueba. Para probar rate limiting, usar un endpoint rápido (ej. `/api/auth/login`) o cronometrar la ráfaga.
+- [x] **Corregido 2026-10-27:** detrás de Caddy todas las peticiones llegaban con la IP del proxy, así que los
+  límites eran **globales** (p. ej. 5 entradas de invitado por minuto para todos). Ahora Caddy toma la IP real
+  (`Cf-Connecting-Ip` del túnel, solo de proxies de red privada), la manda en `X-Real-IP` (reescrito siempre) y
+  `app/rate_limit.py` limita con ella. Prueba: `test_limite_por_ip_real_detras_del_proxy`.
+- [ ] **Pendiente:** el límite es por IP, no por usuario autenticado — dos usuarios detrás del mismo NAT/proxy comparten el mismo límite. Mejorar a limitar por `user_id` del JWT es un roadmap razonable.
 
 ---
 

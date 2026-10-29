@@ -51,6 +51,75 @@ Todo en **una sola VM Ampere A1** para el MVP (no varias VMs orquestadas) — si
 
 **Actualización 2026-09-23:** al agregar voz (Whisper + Piper) y subida de documentos al mismo contenedor del backend, su necesidad de RAM subió de ~1 GB a ~3 GB en `docker-compose.yml` (validado localmente, pendiente medir en la VM ARM64 real — ver [spike_resultados.md](spike_resultados.md)). La suma de los límites configurados (Ollama 6 GB + Qdrant 2 GB + backend 3 GB + proxy 256 MB ≈ 11.3 GB) sigue dentro del presupuesto de 24 GB, pero el uso real bajo carga concurrente todavía no se ha medido — sigue siendo parte del spike pendiente de la Sección 6.
 
+**Actualización 2026-10-10 — la cuota gratuita bajó a la mitad.** La documentación oficial de Oracle
+([Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm)) hoy dice
+**2 OCPU / 12 GB** de Ampere A1 (1,500 OCPU-hora y 9,000 GB-hora al mes), no 4/24. Consecuencias:
+
+- `qwen2.5:7b` (5.5 GB, 60–100 s por consulta en una laptop de 16 núcleos x86) no es viable en 2
+  núcleos ARM. En la nube gratuita se usaría un modelo de 3B y habría que medir la latencia real. Los
+  guardrails deterministas (citas verificadas, calculadoras) pesan más con un modelo más débil.
+- Los `mem_limit` del `docker-compose.yml` (≈ 11.3 GB) deben ajustarse para dejar margen al SO.
+- Oracle **recupera instancias ociosas** (CPU, red y memoria < 20 % durante 7 días).
+  `OLLAMA_KEEP_ALIVE=-1` mantiene el modelo en RAM y ayuda a no caer en ese umbral.
+
+### 2.3 Plan de despliegue (requisito: en la nube, no local)
+
+Los abogados van a probar el sistema desde sus propios dispositivos, así que no puede depender de la
+laptop de desarrollo.
+
+1. **Cuenta de Oracle (la crea el Product Owner).** Elegir la *home region* al registrarse; no se
+   puede cambiar después. Querétaro (`mx-queretaro-1`) es la más cercana a Guerrero. Si no hay
+   capacidad Ampere, se reintenta o se usa otro dominio de disponibilidad.
+2. **Spike en la VM real (Sección 6):** imágenes ARM64 (Ollama, Qdrant, Postgres y Caddy las tienen) y
+   latencia del modelo de 3B.
+3. **Red:** solo el 443 abierto en la Security List (Caddy con TLS automático). SSH solo vía OCI
+   Bastion o desde la IP del administrador. Qdrant, Postgres y Ollama, en red interna.
+4. **Corpus:** `python -m app.ingest_lft` y `python -m app.ingest_leyes` en la VM. Los PDF se
+   descargan de la fuente oficial, no se suben desde la laptop.
+5. **Acceso:** login + rate limiting (ya implementados). Registro abierto o por invitación: a decidir
+   antes de dar el enlace a terceros.
+
+### 2.4 Demo con el cliente: VM de CPU en la nube, $0 (2026-10-28)
+
+Mientras el cliente no apruebe el producto no se gasta dinero, y el link no puede depender de la laptop.
+Medido el 2026-10-27/28 con el flujo completo:
+
+| Dónde corre el LLM | Segundos por consulta completa |
+|---|---|
+| RTX 5060 de la laptop (Ollama en Docker con GPU) | **3–5** |
+| CPU de la laptop, 16 hilos | ~37 |
+| 2 núcleos de CPU (simulando una VM gratuita) | **79–100** con contexto 8192; 67–83 con 4096 |
+
+Con 4096 el modelo deja de leer el artículo correcto en 2 de 16 preguntas (94 % → 81 %) para ahorrar solo ~20 %
+del tiempo, así que se mantiene 8192. La reescritura de la pregunta tampoco se quita: sin ella la búsqueda baja
+de 94 % a 81 %.
+
+**Decisión:** VM de CPU en **Azure for Students** (100 USD de crédito sin tarjeta), ver
+[despliegue_nube.md](despliegue_nube.md). Se descartaron Oracle Always Free (rechazó la tarjeta de débito en
+el registro), Hugging Face Spaces (sin Docker gratuito para cuentas nuevas en 2026) y el túnel desde la laptop
+(depende de que la laptop esté encendida). El servicio `tunel` (perfil `demo`) queda para demos rápidas
+desde la laptop con GPU.
+
+Cuando el cliente apruebe: GPU en la nube (Modal, o VM con GPU pagada o con créditos; ver
+[investigacion_nube_gpu.md](investigacion_nube_gpu.md)).
+
+---|---|
+| RTX 5060 de la laptop (Ollama en Docker con GPU) | **3–5** |
+| CPU de la laptop, 16 hilos | ~37 |
+| 2 núcleos de CPU (lo que da Oracle Always Free) | **~110** (91 s solo la respuesta; cota optimista: los núcleos ARM de Oracle son más lentos) |
+
+Con 2 minutos por respuesta la demo no sirve, así que **la demo se sirve desde la laptop** y se publica con
+un *quick tunnel* de Cloudflare (servicio `tunel` en `docker-compose.yml`, perfil `demo`): link HTTPS
+público sin cuenta ni costo. Limitaciones aceptadas para la demo:
+
+- **La laptop debe estar encendida, conectada y sin suspenderse.** Si se apaga, el link deja de responder.
+- **El link cambia cada vez que el contenedor del túnel reinicia** (p. ej. al reiniciar la laptop). Para un
+  link fijo hace falta una cuenta gratuita (ngrok, Tailscale Funnel o Cloudflare con dominio propio).
+- Sin SLA: Cloudflare ofrece los quick tunnels para pruebas.
+
+Cuando el cliente apruebe: GPU en la nube (Modal, o VM con GPU pagada o con créditos; ver
+[investigacion_nube_gpu.md](investigacion_nube_gpu.md)) o la VM de Oracle para la app con el LLM en GPU remota.
+
 ---
 
 ## 3. Stack de componentes
@@ -86,7 +155,7 @@ Todo en **una sola VM Ampere A1** para el MVP (no varias VMs orquestadas) — si
 | Componente | Elección | Por qué |
 |---|---|---|
 | **LLM runtime** | Ollama | Ya definido como regla del proyecto; soporta ARM64; gestiona cuantización (GGUF) fácilmente. |
-| **Modelo LLM** | `llama3.2:3b` o `qwen2.5:3b` (cuantizado Q4) como punto de partida | Modelos pequeños con buen desempeño en español y viables en CPU ARM sin GPU. A validar empíricamente cuál rinde mejor en textos jurídicos en español (spike, Sección 6). |
+| **Modelo LLM** | `qwen2.5:7b` (Q4, 4.7 GB) — decidido 2026-10-10 | `llama3.2:3b` (el punto de partida) no hacía aritmética confiable: en el cálculo de aguinaldo proporcional evadía o daba un número incorrecto. `qwen2.5:7b` resolvió el cálculo 4/4 veces con números distintos. Costo: ~65 s por consulta en CPU local (vs. ~15-30 s), y más lento aún en la VM ARM64 — pendiente medirlo ahí. Ver [refactorizacion_rag.md §7](refactorizacion_rag.md). |
 | **Embeddings** | `intfloat/multilingual-e5-small` o `BAAI/bge-m3` (HuggingFace) | Modelos de embeddings multilingües con buen soporte de español, ligeros para CPU. |
 | **Vector DB** | Qdrant | Open source, imagen oficial ARM64, buen soporte de filtros por metadata (útil para la interfaz estructurada por área del derecho — [requerimientos_usuario.md §6](requerimientos_usuario.md)), footprint razonable en RAM. |
 | **Backend** | Python + FastAPI | Estándar para servir APIs RAG, fácil integración con LangChain/LlamaIndex si se decide usar un framework de orquestación, o implementación directa. |
@@ -153,7 +222,7 @@ Esta arquitectura debe cumplir el hardening ya documentado en [security_checklis
 
 ## 8. Resumen de decisiones
 
-- **Cómputo:** VM única Oracle Cloud Always Free (Ampere A1, ARM64, 4 OCPU/24GB RAM) — gratuita de forma permanente.
+- **Cómputo:** VM única Oracle Cloud Always Free (Ampere A1, ARM64). **2 OCPU / 12 GB** desde la verificación del 2026-10-10, no 4/24 (ver §2.2).
 - **LLM:** Ollama con modelo pequeño cuantizado (3B, a validar en spike).
 - **Embeddings:** modelo multilingüe HuggingFace liviano (ej. multilingual-e5-small).
 - **Vector DB:** Qdrant.

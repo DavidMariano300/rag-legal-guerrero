@@ -112,6 +112,8 @@ Ver `frontend/Dockerfile` (build en dos etapas: una que compila con Node, otra q
 
 **Por qué se construyó solo el mecanismo, sin un documento legal real:** redactar el texto de un documento legal real (ej. una demanda alimenticia) es trabajo de un abogado, no de ingeniería — un error en ese texto tiene consecuencias legales directas. Lo que sí es trabajo de ingeniería es construir la "maquinaria" que, una vez que exista un texto ya revisado por un abogado, permita convertirlo en una plantilla usable sin tener que programar nada nuevo. Por eso `backend/app/generation.py` define un registro de plantillas (`TEMPLATES`) donde agregar un caso nuevo es solo cuestión de añadir una entrada con el texto y los campos que necesita — el resto del sistema (el formulario que ve el abogado, la exportación a Word) ya funciona automáticamente. La única plantilla que existe hoy está marcada explícitamente como "de prueba" y no debe usarse en ningún trámite real.
 
+**Actualización 2026-09-23 — por qué la sugerencia de generar un documento no aparece siempre:** la primera versión mostraba la sugerencia "¿quieres generar un documento?" después de CUALQUIER respuesta, lo cual no tiene sentido (la mayoría de las consultas son solo informativas, no todas desembocan en un trámite). Se corrigió agregando `palabras_clave` a cada plantilla y una función `sugerir_plantilla()` que compara la pregunta y la respuesta contra esas palabras — la sugerencia **solo aparece si hay una coincidencia real**, y el backend ahora devuelve `plantilla_sugerida: null` en el caso normal. Es una heurística simple (no el LLM decidiendo), suficiente para el MVP; una mejora futura razonable sería que el propio modelo evalúe la relevancia en vez de un match de palabras.
+
 ## 6.4 Por qué la voz es Whisper + Piper autoalojados, y no la API de voz del navegador
 
 **Qué es:** Whisper es un modelo open source que convierte audio hablado en texto (transcripción); Piper es un modelo open source que convierte texto en audio hablado (síntesis de voz). Ambos corren como parte del contenedor del backend, no en un servicio externo.
@@ -119,6 +121,16 @@ Ver `frontend/Dockerfile` (build en dos etapas: una que compila con Node, otra q
 **Por qué NO se usó la función de voz que ya trae el navegador (Web Speech API):** es gratis y no requiere infraestructura propia, pero por dentro envía el audio grabado a los servidores de Google (en Chrome) para transcribirlo. Como las consultas de un abogado pueden incluir información sensible de un cliente hablada en voz alta, eso contradecría directamente el compromiso ya escrito en `aviso_privacidad.md` de que los datos no salen de nuestra infraestructura. Se decidió pagar el costo de más cómputo propio a cambio de mantener ese control.
 
 **Nota de buena práctica (relevante para la auditoría de ciberseguridad):** antes de escribir la integración con Piper, se verificó de forma manual —instalando el paquete real y ejecutándolo— cuáles eran los parámetros exactos de su línea de comandos y qué voces en español existen de verdad, en vez de asumirlo. Esto evitó construir sobre una API inventada o mal recordada. El detalle de esa verificación está documentado en `docs/spike_resultados.md`.
+
+## 6.5 Por qué la autenticación es JWT + Postgres, y por qué bcrypt para las contraseñas
+
+**Qué es:** cuando un abogado crea una cuenta o inicia sesión, el sistema le entrega un "token" (JWT — JSON Web Token): un texto codificado que prueba quién es, con fecha de vencimiento, que el navegador reenvía en cada solicitud siguiente (en vez de mandar la contraseña una y otra vez).
+
+**Por qué JWT y no simplemente guardar una sesión en el servidor:** JWT no requiere que el backend recuerde "quién está conectado" en memoria o en una tabla de sesiones — el propio token, firmado con una clave secreta (`JWT_SECRET_KEY`), contiene la prueba. Esto es más simple de operar en un MVP con un solo servidor. La contrapartida (ver Sección 10, roadmap) es que un token ya emitido no se puede "invalidar a la fuerza" antes de su vencimiento sin infraestructura adicional — por eso el vencimiento se fijó en 24 horas, no en semanas.
+
+**Por qué las contraseñas nunca se guardan tal cual (bcrypt):** si la base de datos de usuarios se filtrara algún día, guardar la contraseña "en texto plano" expondría directamente las contraseñas reales de todos los abogados. `bcrypt` convierte la contraseña en un texto irreversible (un "hash") antes de guardarla; al iniciar sesión, se vuelve a aplicar la misma operación a la contraseña ingresada y se compara el resultado, sin que el sistema necesite conocer nunca la contraseña original. Cada hash incluye además un "salt" aleatorio, así que dos usuarios con la misma contraseña obtienen hashes distintos — evita que un atacante identifique contraseñas repetidas de un vistazo. Verificado en `backend/tests/test_password_hashing.py`.
+
+**Por qué se protegieron TODOS los endpoints de consulta/documentos/voz:** antes de esto, cualquiera con la URL del sistema podía usarlo sin identificarse — inconsistente con el requerimiento de "multiusuario con autenticación" definido desde el inicio ([requerimientos_usuario.md §6](requerimientos_usuario.md)). Ahora cada uno de esos endpoints exige `Depends(get_current_user)`, que decodifica el JWT y rechaza la solicitud (401) si no es válido.
 
 ## 7. Buenas prácticas de programación aplicadas (y por qué importan)
 
@@ -158,6 +170,7 @@ rag-legal-guerrero/
 ├── LICENSE                            # Apache 2.0
 ├── docker-compose.yml                 # Orquesta todos los servicios
 ├── .env.example                       # Plantilla de variables de entorno (copiar a .env)
+├── .github/workflows/ci.yml           # Pruebas de backend + build de frontend en cada push/PR
 ├── docs/                              # Toda la documentación (Docs-as-Code)
 │   ├── requerimientos_usuario.md
 │   ├── arquitectura.md
@@ -168,8 +181,14 @@ rag-legal-guerrero/
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
+│   ├── pytest.ini
+│   ├── tests/                         # 28 pruebas — auth, generación, chunking, hashing
 │   └── app/
-│       ├── main.py                    # Define los endpoints de la API (ej. /api/query)
+│       ├── main.py                    # Endpoints de la API (ej. /api/query) y rate limiting
+│       ├── auth.py                    # JWT, hashing de contraseñas, dependencia get_current_user
+│       ├── db.py                      # Conexión SQLAlchemy a Postgres
+│       ├── models.py                  # Modelo User
+│       ├── rate_limit.py              # Configuración de slowapi
 │       ├── rag.py                     # Lógica de recuperación + generación
 │       ├── ingest.py                  # Script para cargar documentos al vector DB
 │       ├── documents.py               # Subida ad-hoc de documentos (temporal, por sesión)
@@ -181,6 +200,7 @@ rag-legal-guerrero/
 │   └── src/
 │       ├── App.tsx                    # Layout principal: filtro por área, formulario, resultados
 │       ├── api.ts                     # Llamadas a la API del backend
+│       ├── auth.ts                    # Manejo del token JWT (guardar/leer/limpiar, authFetch)
 │       ├── hooks/useSettings.ts       # Preferencias de tema/tamaño de texto (localStorage)
 │       └── components/                # SettingsPanel, CopyButton, DocumentUpload,
 │                                       # DocumentGenerator, VoiceControls
@@ -279,18 +299,26 @@ El proyecto se distribuye bajo licencia **Apache 2.0** ([LICENSE](../LICENSE)), 
 
 ## 10. Roadmap técnico y pendientes
 
-- [ ] Ejecutar y documentar resultados del spike técnico en una VM real de Oracle Cloud (ARM64) — ver [arquitectura.md §6](arquitectura.md).
-- [ ] Definir e implementar el sourcing real del corpus legal ([requerimientos_usuario.md §4](requerimientos_usuario.md)).
-- [ ] Implementar autenticación multiusuario real (actualmente el backend del spike no tiene login, y el frontend no tiene pantalla de inicio de sesión).
 - [x] Construir el frontend estructurado — implementado en `frontend/` (React + Vite + TS, servido vía Caddy) y validado end-to-end en local.
 - [x] Tema claro/oscuro, tamaño de texto ajustable, diseño responsive y copiar al portapapeles.
 - [x] Subida de documentos ad-hoc (temporal, por sesión) — mecanismo implementado y validado.
 - [x] Mecanismo extensible de generación de documentos (sin plantillas legales reales todavía).
 - [x] Voz autoalojada (Whisper STT + Piper TTS) — implementado y validado localmente.
+- [x] Autenticación multiusuario real (registro/login con JWT, endpoints protegidos) — ver [Sección 6.5](#65-por-qué-la-autenticación-es-jwt--postgres-y-por-qué-bcrypt-para-las-contraseñas).
+- [x] Rate limiting en endpoints costosos y de autenticación — validado con prueba de ráfaga real.
+- [x] Expiración/limpieza automática de documentos subidos por sesión.
+- [x] Límite de duración de audio en transcripción de voz.
+- [x] Pruebas automatizadas básicas del backend (28 pruebas, `backend/tests/`) — auth, generación de documentos, chunking, parseo del corpus, hashing de contraseñas.
+- [x] Pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`) — corre las pruebas del backend y el build del frontend en cada push/PR.
+- [x] Primer corpus real ingerido: Ley Federal del Trabajo completa (1,264 artículos, texto oficial vigente) — `backend/app/ingest_lft.py`, validado con pruebas de fidelidad reales. Ver [spike_resultados.md §5.2](spike_resultados.md).
+- [ ] **Bloqueado en el usuario, no en ingeniería:** ejecutar y documentar el spike técnico en una VM real de Oracle Cloud (ARM64) — requiere que el Product Owner cree la cuenta (no delegable a un agente). Ver [arquitectura.md §6](arquitectura.md).
+- [ ] Ampliar el sourcing real del corpus legal: Guerrero estatal, otras leyes federales, jurisprudencia ([requerimientos_usuario.md §4](requerimientos_usuario.md)).
+- [ ] Mejorar la precisión del LLM al citar el número de artículo correcto cuando varios fragmentos recuperados tienen scores muy cercanos (hallazgo real durante la prueba de fidelidad — ver [spike_resultados.md §5.2](spike_resultados.md)).
+- [x] Mecanismo anti-alucinación v1: `score_threshold` + metadato `ley` + rechazo explícito — superado por v2 (ver siguiente línea).
+- [x] **Refactor anti-alucinación v2** (query rewriting + búsqueda híbrida BM25/vectorial + system prompt en dos pasos) — resuelve 4 de los 6 casos reales de `docs/diagnostico_rag.csv` de forma consistente; 2 quedan parcialmente resueltos (recuperación arreglada, generación todavía inconsistente en cálculos/comparaciones). Ver [refactorizacion_rag.md](refactorizacion_rag.md) para el detalle completo, honesto, de qué se corrigió y qué no.
+- [ ] Cerrar por completo los Casos 2 y 5 (evasión inconsistente del LLM al calcular/comparar cifras) — ver recomendaciones en [refactorizacion_rag.md §5](refactorizacion_rag.md).
+- [ ] El rechazo del modelo no siempre usa la frase exacta pedida (sí rechaza, pero con redacción propia) — evaluar modelo más grande o verificación por contenido en vez de string exacto.
 - [ ] Añadir una plantilla legal real (ej. demanda alimenticia) al mecanismo de generación de documentos, redactada y revisada por un abogado.
-- [ ] Expiración/limpieza automática de documentos subidos por sesión (hoy solo se borran manualmente vía el botón "Quitar todos los documentos").
-- [ ] Definir e implementar el sourcing real del corpus legal ([requerimientos_usuario.md §4](requerimientos_usuario.md)).
-- [ ] Implementar autenticación multiusuario real (actualmente el backend del spike no tiene login, y el frontend no tiene pantalla de inicio de sesión).
-- [ ] Definir y automatizar pruebas (tests) — no existen todavía. Esto es especialmente relevante antes de la auditoría de ciberseguridad planeada.
-- [ ] Definir pipeline de CI/CD (integración/despliegue continuo) en GitHub Actions.
+- [ ] Revocación de tokens / logout del lado servidor, y refresh tokens (hoy el logout solo borra el token del navegador — ver [security_checklist.md §5.1](security_checklist.md)).
+- [ ] Rate limiting por usuario autenticado en vez de por IP.
 - [ ] Completar los campos pendientes `[...]` en `aviso_privacidad.md` y en las plantillas de la Sección 9 de este manual, con revisión legal formal.

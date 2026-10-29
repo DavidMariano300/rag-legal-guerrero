@@ -26,16 +26,46 @@ Sistema RAG (Retrieval-Augmented Generation) 100% open source para asistir a abo
 
 ```bash
 cp .env.example .env
+# Editar .env y definir JWT_SECRET_KEY (generar con: python3 -c "import secrets; print(secrets.token_hex(32))")
 docker compose up -d --build
-docker compose exec ollama ollama pull llama3.2:3b
-docker compose exec backend python -m app.ingest
+docker compose exec ollama ollama pull qwen3.5:4b
+docker compose exec backend python -m app.ingest       # corpus ficticio de prueba
+docker compose exec backend python -m app.ingest_lft   # Ley Federal del Trabajo real (descarga el PDF oficial)
 ```
 
-La interfaz queda disponible en `http://localhost:8080`.
+La interfaz queda disponible en `http://localhost:8080` — crea una cuenta desde la pantalla de inicio de sesión para poder usarla (todos los endpoints requieren autenticación).
+
+### Con GPU NVIDIA (recomendado)
+
+Con el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+instalado, agregar al `.env` la línea `COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml`. Ollama corre
+en la GPU y cada consulta tarda 3–5 s en lugar de ~40 s.
+
+### Demo pública (link para el cliente, sin costo)
+
+```bash
+docker compose --profile demo up -d tunel
+docker compose logs tunel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com'
+```
+
+El link sirve mientras la laptop esté encendida y cambia si el túnel reinicia. Para apagarlo:
+`docker compose stop tunel`. Detalles en [docs/arquitectura.md](docs/arquitectura.md) §2.4. La demo para el cliente vive en la nube: [docs/despliegue_nube.md](docs/despliegue_nube.md).
+
+## Cómo correr las pruebas
+
+```bash
+docker compose exec backend pytest tests/ -v
+```
+
+## Probar la API manualmente
+
+Colección de [Bruno](https://www.usebruno.com/) (cliente de API open source) lista en
+[`bruno/RAG-Legal-Guerrero`](bruno/RAG-Legal-Guerrero) — login, consultas de ejemplo, y una prueba
+automatizada del mecanismo anti-alucinación. Ver [bruno/README.md](bruno/README.md).
 
 ## Estado actual
 
-Stack completo (frontend + backend + Ollama + Qdrant + Postgres) validado end-to-end en entorno local con datos de prueba ficticios. Pendiente: despliegue real en Oracle Cloud (ARM64), sourcing del corpus legal real, y autenticación multiusuario — ver [docs/spike_resultados.md](docs/spike_resultados.md) y la sección de roadmap en [docs/manual_ingenieria_software.md](docs/manual_ingenieria_software.md#10-roadmap-técnico-y-pendientes).
+Stack completo (frontend + backend + Ollama + Qdrant + Postgres) validado end-to-end en entorno local, con autenticación multiusuario, rate limiting, 28 pruebas automatizadas, y un primer corpus **real** (Ley Federal del Trabajo completa, 1,264 artículos, texto oficial). Pendiente: despliegue real en Oracle Cloud (ARM64) y ampliar el sourcing a legislación de Guerrero — ver [docs/spike_resultados.md](docs/spike_resultados.md) y la sección de roadmap en [docs/manual_ingenieria_software.md](docs/manual_ingenieria_software.md#10-roadmap-técnico-y-pendientes).
 
 ## Licencia
 
