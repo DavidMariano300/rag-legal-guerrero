@@ -19,7 +19,7 @@ export default function CopyButton({ text, label = "Copiar" }: Props) {
   }
 
   return (
-    <button type="button" className="copy-button" onClick={handleCopy}>
+    <button type="button" className="boton-secundario" onClick={handleCopy}>
       {copiado ? "¡Copiado!" : label}
     </button>
   );

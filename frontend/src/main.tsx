@@ -1,5 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@fontsource-variable/newsreader/opsz.css";
+import "@fontsource-variable/schibsted-grotesk";
 import App from "./App";
 import "./App.css";
 

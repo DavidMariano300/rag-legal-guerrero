@@ -70,10 +70,14 @@ export default function VoiceControls({ modo = "dictar", onTranscribed, texto }:
   if (modo === "hablar") {
     return (
       <>
-        <button type="button" className="copy-button" onClick={reproducirRespuesta} disabled={procesando}>
-          {procesando ? "Generando audio..." : "🔊 Escuchar"}
+        <button type="button" className="boton-secundario" onClick={reproducirRespuesta} disabled={procesando}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+            <path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" />
+          </svg>
+          {procesando ? "Generando audio…" : "Escuchar"}
         </button>
-        {error && <span style={{ fontSize: "0.75rem", color: "var(--error-text)" }}>{error}</span>}
+        {error && <span style={{ fontSize: "0.75rem", color: "var(--error-texto)" }}>{error}</span>}
       </>
     );
   }
@@ -88,10 +92,21 @@ export default function VoiceControls({ modo = "dictar", onTranscribed, texto }:
         aria-label={grabando ? "Detener grabación" : "Dictar pregunta por voz"}
         title={grabando ? "Detener grabación" : "Dictar por voz"}
       >
-        {procesando ? "..." : grabando ? "⏹" : "🎤"}
+        {procesando ? (
+          "…"
+        ) : grabando ? (
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="7" y="7" width="10" height="10" rx="1.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <rect x="9" y="3.5" width="6" height="11" rx="3" />
+            <path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21" />
+          </svg>
+        )}
       </button>
       {error && (
-        <div className="error-panel" style={{ marginTop: "0.5rem" }}>
+        <div className="error-panel">
           {error}
         </div>
       )}

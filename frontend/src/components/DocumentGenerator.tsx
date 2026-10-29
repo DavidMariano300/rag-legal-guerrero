@@ -1,20 +1,21 @@
 import { FormEvent, useEffect, useState } from "react";
-import { generarDocumento, listarPlantillas, Plantilla } from "../api";
+import { generarDocumento, listarPlantillas, Plantilla, PlantillaSugerida } from "../api";
 
-export default function DocumentGenerator() {
+interface Props {
+  sugerencia: PlantillaSugerida;
+}
+
+export default function DocumentGenerator({ sugerencia }: Props) {
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
   const [expandido, setExpandido] = useState(false);
-  const [seleccionada, setSeleccionada] = useState<string>("");
+  const [seleccionada, setSeleccionada] = useState<string>(sugerencia.id);
   const [valores, setValores] = useState<Record<string, string>>({});
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     listarPlantillas()
-      .then((data) => {
-        setPlantillas(data);
-        if (data.length > 0) setSeleccionada(data[0].id);
-      })
+      .then(setPlantillas)
       .catch(() => setError("No se pudieron cargar las plantillas de documentos."));
   }, []);
 
@@ -41,13 +42,11 @@ export default function DocumentGenerator() {
     }
   }
 
-  if (plantillas.length === 0) return null;
-
   if (!expandido) {
     return (
       <div className="doc-suggestion">
-        <span>💡 ¿Quieres generar un documento con esta información?</span>
-        <button type="button" className="copy-button" onClick={() => setExpandido(true)}>
+        <span>Puedes generar un borrador de {sugerencia.nombre} en Word a partir de esta consulta.</span>
+        <button type="button" className="boton-secundario" onClick={() => setExpandido(true)}>
           Generar documento
         </button>
       </div>
@@ -58,16 +57,16 @@ export default function DocumentGenerator() {
     <section className="panel">
       <div className="panel-header">
         <h2>Generar documento (mecanismo de prueba)</h2>
-        <button type="button" className="copy-button" onClick={() => setExpandido(false)}>
+        <button type="button" className="boton-secundario" onClick={() => setExpandido(false)}>
           Cerrar
         </button>
       </div>
-      <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+      <p className="panel-nota">
         Esto genera un documento .docx de ejemplo para validar el mecanismo. Todavía no incluye plantillas de
         documentos legales reales.
       </p>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      <form onSubmit={handleSubmit} className="generador">
         <label className="field">
           <span>Tipo de documento</span>
           <select value={seleccionada} onChange={(e) => setSeleccionada(e.target.value)}>

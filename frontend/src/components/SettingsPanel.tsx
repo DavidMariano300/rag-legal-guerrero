@@ -27,12 +27,12 @@ export default function SettingsPanel({ theme, setTheme, fontSize, setFontSize }
     <div className="settings">
       <button
         type="button"
-        className="settings-toggle"
+        className="enlace"
         onClick={() => setOpen((v) => !v)}
         aria-label="Preferencias de la interfaz"
         aria-expanded={open}
       >
-        ⚙ Preferencias
+        Preferencias
       </button>
 
       {open && (

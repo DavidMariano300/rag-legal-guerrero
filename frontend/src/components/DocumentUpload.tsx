@@ -60,7 +60,13 @@ export default function DocumentUpload({ sessionId, onHasDocuments }: Props) {
         aria-label="Adjuntar documento"
         title="Adjuntar documento (PDF, Word o texto)"
       >
-        {subiendo ? "..." : "📎"}
+        {subiendo ? (
+          "…"
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4l7.8-7.8" />
+          </svg>
+        )}
       </button>
       <input
         ref={inputRef}
@@ -74,7 +80,7 @@ export default function DocumentUpload({ sessionId, onHasDocuments }: Props) {
         <div className="attach-chips">
           {archivos.map((a) => (
             <span className="chip" key={a.filename} title={`${a.fragmentos_indexados} fragmentos indexados`}>
-              📄 {a.filename}
+              <span className="chip-nombre">{a.filename}</span>
               <button type="button" onClick={() => quitarArchivo(a.filename)} aria-label={`Quitar ${a.filename}`}>
                 ✕
               </button>
@@ -84,7 +90,7 @@ export default function DocumentUpload({ sessionId, onHasDocuments }: Props) {
       )}
 
       {error && (
-        <div className="error-panel" style={{ marginTop: "0.5rem" }}>
+        <div className="error-panel">
           {error}
         </div>
       )}

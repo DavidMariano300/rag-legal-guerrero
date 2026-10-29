@@ -1,14 +1,30 @@
+import { authFetch } from "./auth";
+
 export interface Fragmento {
   texto: string;
   fuente: string;
+  ley: string | null;
   area: string;
   score: number;
+}
+
+export interface PlantillaSugerida {
+  id: string;
+  nombre: string;
+}
+
+export interface TiemposMs {
+  recuperacion: number;
+  generacion: number;
+  total: number;
 }
 
 export interface QueryResponse {
   respuesta: string;
   fragmentos: Fragmento[];
   disclaimer: string;
+  plantilla_sugerida: PlantillaSugerida | null;
+  tiempos_ms: TiemposMs;
 }
 
 export async function consultar(
@@ -17,7 +33,7 @@ export async function consultar(
   sessionId: string,
   incluirDocumentos: boolean,
 ): Promise<QueryResponse> {
-  const res = await fetch("/api/query", {
+  const res = await authFetch("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -29,7 +45,7 @@ export async function consultar(
   });
 
   if (!res.ok) {
-    throw new Error(`Error del servidor (${res.status})`);
+    throw new Error(res.status === 401 ? "Tu sesión expiró, inicia sesión de nuevo." : `Error del servidor (${res.status})`);
   }
 
   return res.json();
@@ -45,7 +61,7 @@ export async function subirDocumento(sessionId: string, file: File): Promise<Doc
   formData.append("file", file);
   formData.append("session_id", sessionId);
 
-  const res = await fetch("/api/documents/upload", {
+  const res = await authFetch("/api/documents/upload", {
     method: "POST",
     body: formData,
   });
@@ -59,7 +75,7 @@ export async function subirDocumento(sessionId: string, file: File): Promise<Doc
 }
 
 export async function borrarDocumentosSesion(sessionId: string): Promise<void> {
-  const res = await fetch(`/api/documents/${sessionId}`, { method: "DELETE" });
+  const res = await authFetch(`/api/documents/${sessionId}`, { method: "DELETE" });
   if (!res.ok) {
     throw new Error(`Error al borrar documentos (${res.status})`);
   }
@@ -70,13 +86,14 @@ export async function transcribirAudio(sessionId: string, audio: Blob): Promise<
   formData.append("audio", audio, "consulta.webm");
   formData.append("session_id", sessionId);
 
-  const res = await fetch("/api/voice/transcribir", {
+  const res = await authFetch("/api/voice/transcribir", {
     method: "POST",
     body: formData,
   });
 
   if (!res.ok) {
-    throw new Error(`Error al transcribir audio (${res.status})`);
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail || `Error al transcribir audio (${res.status})`);
   }
 
   const data = await res.json();
@@ -84,7 +101,7 @@ export async function transcribirAudio(sessionId: string, audio: Blob): Promise<
 }
 
 export async function hablarTexto(texto: string): Promise<Blob> {
-  const res = await fetch("/api/voice/hablar", {
+  const res = await authFetch("/api/voice/hablar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ texto }),
@@ -112,7 +129,7 @@ export interface Plantilla {
 }
 
 export async function listarPlantillas(): Promise<Plantilla[]> {
-  const res = await fetch("/api/documents/templates");
+  const res = await authFetch("/api/documents/templates");
   if (!res.ok) {
     throw new Error(`Error al listar plantillas (${res.status})`);
   }
@@ -120,7 +137,7 @@ export async function listarPlantillas(): Promise<Plantilla[]> {
 }
 
 export async function generarDocumento(templateId: string, valores: Record<string, string>): Promise<Blob> {
-  const res = await fetch(`/api/documents/generate/${templateId}`, {
+  const res = await authFetch(`/api/documents/generate/${templateId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(valores),
