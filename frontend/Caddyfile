@@ -1,10 +1,38 @@
-:80 {
+{
+	servers {
+		# La IP real del usuario: el túnel de Cloudflare la manda en Cf-Connecting-Ip. Solo se le cree a
+		# proxies de red privada (el contenedor del túnel); de internet no llega nada directo a Caddy.
+		trusted_proxies static private_ranges
+		client_ip_headers Cf-Connecting-Ip X-Forwarded-For
+	}
+}
+
+# Dirección del sitio: en local ":80" (HTTP en el 8080 del host); en el servidor, el dominio de SITIO
+# (p. ej. 129-146-1-2.sslip.io) y Caddy obtiene el certificado HTTPS de Let's Encrypt automáticamente.
+{$SITIO::80} {
+	# Registro de accesos (método, ruta, estado) en los logs del contenedor: `docker logs rag_proxy`.
+	log
+
 	handle /api/* {
-		reverse_proxy backend:8000
+		reverse_proxy backend:8000 {
+			# El backend limita por IP con este encabezado (app/rate_limit.py); Caddy lo reescribe siempre.
+			header_up X-Real-IP {client_ip}
+		}
 	}
 
+	# Los archivos de /assets llevan hash en el nombre: se guardan indefinidamente. Uno que ya no existe
+	# (de un despliegue anterior) da 404, nunca index.html, para que el navegador no guarde HTML como JS.
+	handle /assets/* {
+		root * /srv
+		@existe file
+		header @existe Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# index.html se revalida en cada visita para que un despliegue nuevo se vea sin limpiar caché.
 	handle {
 		root * /srv
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

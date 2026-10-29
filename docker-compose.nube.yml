@@ -1,0 +1,23 @@
+# Servidor de la demo en la nube (VM Linux sin GPU; hoy Azure for Students, ver docs/despliegue_nube.md).
+# En la VM, el .env lleva
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.nube.yml
+#   SITIO=<dominio de la VM>   (p. ej. amate-demo.northcentralus.cloudapp.azure.com)
+services:
+  ollama:
+    ports: !reset []  # sin acceso desde fuera: solo el backend, por la red interna
+  qdrant:
+    ports: !reset []
+  backend:
+    environment:
+      OLLAMA_TIMEOUT: "600"  # en 2 núcleos una respuesta pasa de 2 min; con 120 s el usuario vería un error
+  proxy:
+    environment:
+      SITIO: ${SITIO:?Definir SITIO en el .env con el dominio de la VM}
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data  # certificados: sin volumen, cada reinicio pediría otro a Let's Encrypt (con límite semanal)
+
+volumes:
+  caddy_data:

@@ -1,0 +1,14 @@
+# Ollama en GPU NVIDIA. Requiere NVIDIA Container Toolkit en el host (docs/investigacion_nube_gpu.md).
+# Uso: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+# (o COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml en el .env para no repetir los -f).
+services:
+  ollama:
+    environment:
+      OLLAMA_FLASH_ATTENTION: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

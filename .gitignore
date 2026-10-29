@@ -33,3 +33,7 @@ models/
 .vscode/
 .idea/
 .DS_Store
+
+# Herramientas locales (grafo de conocimiento, configuración de vista previa)
+graphify-out/
+.claude/
