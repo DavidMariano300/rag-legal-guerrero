@@ -1,0 +1,33 @@
+meta {
+  name: Consulta - fuera de tema (anti-alucinacion)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/query
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "pregunta": "¿Cuál es el plazo para desahogar pruebas en un procedimiento del Código Procesal Civil de Guerrero?"
+  }
+}
+
+tests {
+  // El modelo (llama3.2:3b) no siempre usa la frase exacta del system prompt al rechazar,
+  // aunque sí rechaza de forma consistente — ver docs/spike_resultados.md §5.3. Por eso esta
+  // prueba busca cualquiera de las variantes de rechazo observadas, no un string exacto.
+  test("debe rechazar en vez de alucinar con fragmentos ajenos", function() {
+    const r = res.body.respuesta.toLowerCase();
+    const parece_rechazo = ["no cuento", "no cuenta", "no hay información", "no puedo proporcionar", "no tengo"]
+      .some((frase) => r.includes(frase));
+    expect(parece_rechazo).to.equal(true);
+  });
+}

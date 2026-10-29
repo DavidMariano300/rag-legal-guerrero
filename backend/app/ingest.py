@@ -12,7 +12,7 @@ from pathlib import Path
 
 from qdrant_client.http import models as qmodels
 
-from app.rag import COLLECTION_NAME, ensure_collection, get_embedder, get_qdrant
+from app.rag import COLLECTION_NAME, embed_passages, ensure_collection, get_embedder, get_qdrant
 
 FIXTURE_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "sample_corpus.md"
 
@@ -56,12 +56,17 @@ def main() -> None:
     client = get_qdrant()
     points = []
     for idx, article in enumerate(articles):
-        vector = embedder.encode(f"passage: {article['texto']}").tolist()
+        vector = embed_passages([article["texto"]])[0].tolist()
         points.append(
             qmodels.PointStruct(
                 id=idx,
                 vector=vector,
-                payload={"texto": article["texto"], "fuente": article["fuente"], "area": article["area"]},
+                payload={
+                    "texto": article["texto"],
+                    "fuente": article["fuente"],
+                    "area": article["area"],
+                    "ley": "Corpus de prueba (ficticio, no es legislación real)",
+                },
             )
         )
 

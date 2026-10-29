@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "RAG Legal Guerrero",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

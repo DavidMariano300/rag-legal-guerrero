@@ -28,12 +28,21 @@ class CampoPlantilla:
 
 
 class PlantillaDocumento:
-    def __init__(self, id: str, nombre: str, descripcion: str, campos: list[CampoPlantilla], parrafos: list[str]):
+    def __init__(
+        self,
+        id: str,
+        nombre: str,
+        descripcion: str,
+        campos: list[CampoPlantilla],
+        parrafos: list[str],
+        palabras_clave: list[str],
+    ):
         self.id = id
         self.nombre = nombre
         self.descripcion = descripcion
         self.campos = campos
         self.parrafos = parrafos  # cada uno puede usar {{ nombre_campo }} (sintaxis Jinja2)
+        self.palabras_clave = palabras_clave  # usadas por sugerir_plantilla(); NO se exponen al frontend
 
     def to_dict(self) -> dict:
         return {
@@ -58,6 +67,11 @@ TEMPLATES: dict[str, PlantillaDocumento] = {
             CampoPlantilla("fecha", "Fecha", "fecha", True),
             CampoPlantilla("asunto", "Asunto", "texto", False),
         ],
+        # Palabras de ejemplo para probar el mecanismo de sugerencia (Sección "sugerir_plantilla").
+        # Al agregar una plantilla real, sus palabras clave deben reflejar el tema real del documento.
+        # Frases específicas, no palabras sueltas genéricas ("demanda", "indemnización" hubieran
+        # coincidido con casi cualquier consulta legal y hubieran repetido el problema original.
+        palabras_clave=["pensión alimenticia", "pension alimenticia", "demanda alimenticia"],
         parrafos=[
             "DOCUMENTO DE PRUEBA — NO ES UN ESCRITO LEGAL REAL",
             "Fecha: {{ fecha }}",
@@ -76,6 +90,20 @@ TEMPLATES: dict[str, PlantillaDocumento] = {
 
 def list_templates() -> list[dict]:
     return [t.to_dict() for t in TEMPLATES.values()]
+
+
+def sugerir_plantilla(pregunta: str, respuesta: str) -> dict | None:
+    """Sugiere una plantilla SOLO si el tema de la consulta la amerita.
+
+    Heurística simple por palabras clave para el MVP — no es una decisión del LLM.
+    Devuelve None en el caso normal (la mayoría de las consultas no ameritan generar
+    un documento), y el dict de la plantilla solo cuando hay una coincidencia real.
+    """
+    texto = f"{pregunta} {respuesta}".lower()
+    for template in TEMPLATES.values():
+        if any(palabra in texto for palabra in template.palabras_clave):
+            return {"id": template.id, "nombre": template.nombre}
+    return None
 
 
 def generate_document(template_id: str, values: dict[str, str]) -> bytes:

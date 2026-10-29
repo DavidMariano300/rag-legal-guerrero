@@ -10,11 +10,13 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import av
 from fastapi import HTTPException
 from faster_whisper import WhisperModel
 
 WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "es")
+MAX_AUDIO_DURATION_SECONDS = int(os.environ.get("MAX_AUDIO_DURATION_SECONDS", "120"))
 
 PIPER_VOICE = os.environ.get("PIPER_VOICE", "es_MX-claude-high")
 PIPER_MODELS_DIR = os.environ.get("PIPER_MODELS_DIR", "/app/models/piper")
@@ -27,6 +29,30 @@ def get_whisper_model() -> WhisperModel:
     if _whisper_model is None:
         _whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
     return _whisper_model
+
+
+def validar_duracion_audio(audio_bytes: bytes) -> None:
+    """Rechaza audios más largos de MAX_AUDIO_DURATION_SECONDS antes de transcribir.
+
+    Evita que un archivo de audio muy largo consuma CPU del modelo Whisper de forma
+    desproporcionada (ver security_checklist.md §4.3). Se prueba la duración leyendo
+    solo los metadatos del contenedor, sin decodificar el audio completo.
+    """
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="No se recibió audio.")
+
+    try:
+        container = av.open(io.BytesIO(audio_bytes))
+        duracion_segundos = container.duration / 1_000_000 if container.duration else None
+        container.close()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="No se pudo leer el audio recibido.") from exc
+
+    if duracion_segundos is not None and duracion_segundos > MAX_AUDIO_DURATION_SECONDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El audio excede la duración máxima permitida ({MAX_AUDIO_DURATION_SECONDS} segundos).",
+        )
 
 
 def transcribe(audio_bytes: bytes) -> str:

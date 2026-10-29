@@ -1,0 +1,22 @@
+meta {
+  name: Consulta - relevante (aguinaldo)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/query
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "pregunta": "¿Cuántos días de aguinaldo debe pagar el patrón?",
+    "area": "Laboral"
+  }
+}
