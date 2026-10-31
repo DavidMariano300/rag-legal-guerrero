@@ -1,5 +1,7 @@
 # RAG Legal Guerrero
 
+> **In English:** open-source legal Q&A for lawyers in Guerrero, Mexico. Answers come from state and federal legislation, quote the article they rely on, and are replaced by a refusal when the quote cannot be found in the retrieved text. FastAPI, Qdrant, PostgreSQL, Ollama, React + TypeScript and Docker Compose, with 88 tests in CI and a [live demo](https://amate-demo.northcentralus.cloudapp.azure.com). The rest of this README is in Spanish.
+
 Sistema RAG (Retrieval-Augmented Generation) 100% open source para asistir a abogados generalistas que ejercen en el Estado de Guerrero, México. Funciona como memoria de consulta rápida sobre legislación estatal y federal aplicable, devolviendo respuestas híbridas (resumen conversacional + fragmentos textuales exactos citando su fuente) para minimizar alucinaciones y facilitar la verificación por un profesional del derecho.
 
 > **Este proyecto es un prototipo (MVP) en desarrollo activo.** No constituye asesoría legal. Ver [docs/aviso_privacidad.md](docs/aviso_privacidad.md) para la limitación de responsabilidad completa.
