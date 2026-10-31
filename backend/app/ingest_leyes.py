@@ -142,7 +142,7 @@ def generar_catalogo() -> list[dict]:
                 nombre = " ".join(html.unescape(re.sub(r"<[^>]+>", "", nombre)).split())
                 nombre = _NOMBRES_MENU.get(nombre.lower(), nombre)
                 if "ABROGAD" in nombre.upper():
-                    print(f"  Excluida (abrogada): {nombre}")
+                    logger.warning("Excluida (abrogada): %s", nombre)
                     continue
                 url = urljoin(urljoin(PORTAL, pagina), href)
                 filas.setdefault(url, {"numero": numero, "nombre": nombre, "area": clasificar_area(nombre), "url": url})
@@ -291,7 +291,7 @@ def _reportar_huerfanos(client, urls_catalogo: set[str]) -> None:
         if offset is None:
             break
     for url, n in conteo.items():
-        print(f"  AVISO: {n} fragmentos de una ley que ya no está en ningún catálogo: {url}")
+        logger.warning("%d fragmentos de una ley que ya no está en ningún catálogo: %s", n, url)
 
 
 def main() -> None:
