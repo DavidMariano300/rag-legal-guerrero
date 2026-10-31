@@ -4,6 +4,12 @@ Sistema RAG (Retrieval-Augmented Generation) 100% open source para asistir a abo
 
 > **Este proyecto es un prototipo (MVP) en desarrollo activo.** No constituye asesoría legal. Ver [docs/aviso_privacidad.md](docs/aviso_privacidad.md) para la limitación de responsabilidad completa.
 
+**Demo en línea:** <https://amate-demo.northcentralus.cloudapp.azure.com> (botón *Consultar sin cuenta*; corre en CPU, cada respuesta tarda alrededor de dos minutos).
+
+![Pantalla de inicio de Amate, la interfaz del proyecto](docs/img/captura_inicio.png)
+
+**Tecnologías:** Python, FastAPI, Qdrant, PostgreSQL, Ollama, sentence-transformers, búsqueda híbrida con BM25, React + Vite + TypeScript, Docker Compose, Caddy, faster-whisper y Piper (voz), pytest y GitHub Actions.
+
 ## Principios del proyecto
 
 1. **100% open source y sin APIs de pago** — modelos de HuggingFace, Ollama, y una base de datos vectorial libre.
@@ -63,9 +69,39 @@ Colección de [Bruno](https://www.usebruno.com/) (cliente de API open source) li
 [`bruno/RAG-Legal-Guerrero`](bruno/RAG-Legal-Guerrero) — login, consultas de ejemplo, y una prueba
 automatizada del mecanismo anti-alucinación. Ver [bruno/README.md](bruno/README.md).
 
+## Ejemplo de uso
+
+Consulta a la API de la demo con un acceso de invitado:
+
+```bash
+BASE=https://amate-demo.northcentralus.cloudapp.azure.com
+TOKEN=$(curl -s -X POST $BASE/api/auth/invitado | jq -r .access_token)
+curl -s -X POST $BASE/api/query \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"pregunta": "¿Cuántos días de aguinaldo debe pagar el patrón?", "area": "Laboral"}'
+```
+
+Respuesta real (recortada):
+
+```json
+{
+  "respuesta": "El patrón debe pagar un aguinaldo equivalente a quince días de salario.\n\n«equivalente a quince días de salario, por lo menos» (Artículo 87)",
+  "respaldada": true,
+  "fragmentos": [
+    {
+      "fuente": "Artículo 87, Ley Federal del Trabajo (texto vigente, Cámara de Diputados del H. Congreso de la Unión)",
+      "texto": "Los trabajadores tendrán derecho a un aguinaldo anual que deberá pagarse antes del día veinte de diciembre, equivalente a quince días de salario, por lo menos. ...",
+      "score": 1.0
+    }
+  ]
+}
+```
+
+`respaldada` indica que cada cita textual de la respuesta aparece literalmente en el fragmento del artículo citado. Si no se puede respaldar, la API responde «No cuento con la legislación necesaria en mi base de datos para responder a esta consulta.» en lugar de una respuesta sin fundamento.
+
 ## Estado actual
 
-Stack completo (frontend + backend + Ollama + Qdrant + Postgres) validado end-to-end en entorno local, con autenticación multiusuario, rate limiting, 28 pruebas automatizadas, y un primer corpus **real** (Ley Federal del Trabajo completa, 1,264 artículos, texto oficial). Pendiente: despliegue real en Oracle Cloud (ARM64) y ampliar el sourcing a legislación de Guerrero — ver [docs/spike_resultados.md](docs/spike_resultados.md) y la sección de roadmap en [docs/manual_ingenieria_software.md](docs/manual_ingenieria_software.md#10-roadmap-técnico-y-pendientes).
+Stack completo (frontend + backend + Ollama + Qdrant + Postgres) desplegado en una VM de Azure (solo CPU) con HTTPS, autenticación multiusuario y acceso de invitado, rate limiting y 88 pruebas automatizadas que corren en cada push. Corpus real: legislación del Estado de Guerrero y la Ley Federal del Trabajo completa (texto oficial). Detalles y pendientes en [docs/despliegue_nube.md](docs/despliegue_nube.md) y en el roadmap de [docs/manual_ingenieria_software.md](docs/manual_ingenieria_software.md#10-roadmap-técnico-y-pendientes).
 
 ## Licencia
 
